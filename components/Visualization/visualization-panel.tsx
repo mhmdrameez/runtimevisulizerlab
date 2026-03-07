@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   MemoryEntry,
   SimulationSnapshot,
@@ -17,11 +18,34 @@ interface VisualizationPanelProps {
   mode: VisualizationMode;
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function SectionCard({
+  title,
+  children,
+  collapsible = false,
+  open = true,
+  onToggle,
+}: {
+  title: string;
+  children: React.ReactNode;
+  collapsible?: boolean;
+  open?: boolean;
+  onToggle?: () => void;
+}) {
   return (
     <article className="rounded-xl border border-zinc-700 bg-[#101827] p-4">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-cyan-200">{title}</h3>
-      {children}
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-200">{title}</h3>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-100"
+          >
+            {open ? "Hide" : "Show"}
+          </button>
+        ) : null}
+      </div>
+      {open ? children : null}
     </article>
   );
 }
@@ -177,6 +201,10 @@ function getEngineModel(
 }
 
 export function VisualizationPanel({ step, steps, stepIndex, totalSteps, language, mode }: VisualizationPanelProps) {
+  const [showCurrentStep, setShowCurrentStep] = useState(true);
+  const [showRuntime, setShowRuntime] = useState(true);
+  const [showLanguageModel, setShowLanguageModel] = useState(true);
+
   if (!step) {
     return <section className="rounded-xl border border-zinc-700 bg-[#101827] p-5 text-sm text-zinc-300">No simulation steps available.</section>;
   }
@@ -193,14 +221,24 @@ export function VisualizationPanel({ step, steps, stepIndex, totalSteps, languag
 
   return (
     <section className="flex min-h-0 flex-col gap-3 overflow-auto pr-1">
-      <SectionCard title="What Line Is Running">
+      <SectionCard
+        title="What Line Is Running"
+        collapsible
+        open={showCurrentStep}
+        onToggle={() => setShowCurrentStep((current) => !current)}
+      >
         <p className="text-sm text-zinc-400">Running Step {stepIndex + 1} of {totalSteps}</p>
         <p className="mt-2 text-sm text-zinc-300">Running Line {step.line}</p>
         <p className="mt-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-mono text-sm text-cyan-100">{step.lineExecuted}</p>
         <p className="mt-3 text-sm text-zinc-200"><span className="font-semibold text-zinc-100">Explanation:</span> {step.details}</p>
       </SectionCard>
 
-      <SectionCard title="Inside JavaScript Right Now">
+      <SectionCard
+        title="Inside JavaScript Right Now"
+        collapsible
+        open={showRuntime}
+        onToggle={() => setShowRuntime((current) => !current)}
+      >
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
           <div className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
             <h4 className="mb-2 text-sm font-semibold text-zinc-100">Call Stack (what is running)</h4>
@@ -274,7 +312,12 @@ export function VisualizationPanel({ step, steps, stepIndex, totalSteps, languag
         ) : null}
       </SectionCard>
 
-      <SectionCard title="How This Language Runs">
+      <SectionCard
+        title="How This Language Runs"
+        collapsible
+        open={showLanguageModel}
+        onToggle={() => setShowLanguageModel((current) => !current)}
+      >
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {engineModel.map((item) => (
             <article key={item.title} className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
