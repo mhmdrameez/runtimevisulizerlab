@@ -114,8 +114,8 @@ export function SimulatorWorkbench() {
       <div className="mx-auto flex h-full max-w-[1600px] flex-col rounded-2xl border border-cyan-400/20 bg-[#0a0e17]/95 shadow-[0_20px_80px_rgba(2,8,23,0.6)]">
         <header className="flex items-center justify-between border-b border-zinc-700/60 px-5 py-3">
           <div>
-            <h1 className="font-mono text-sm uppercase tracking-[0.22em] text-cyan-300">Runtime Visualizer Lab</h1>
-            <p className="text-xs text-zinc-400">See how JavaScript runs, step by step, in simple English.</p>
+            <h1 className="font-mono text-sm uppercase tracking-[0.22em] text-cyan-300">INSIDE JS</h1>
+            <p className="text-xs text-zinc-400">A simple lab to understand JavaScript runtime.</p>
           </div>
           <div className="flex items-center gap-2">
             <p className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100">JavaScript</p>
