@@ -16,6 +16,14 @@ interface VisualizationPanelProps {
   totalSteps: number;
   language: SupportedLanguage;
   mode: VisualizationMode;
+  performance: {
+    estimatedRunMs: number;
+    simulationBuildMs: number;
+    lastRunMs: number | null;
+    currentMemoryBytes: number;
+    peakMemoryBytes: number;
+    tips: string[];
+  };
 }
 
 function SectionCard({
@@ -200,7 +208,15 @@ function getEngineModel(
   ];
 }
 
-export function VisualizationPanel({ step, steps, stepIndex, totalSteps, language, mode }: VisualizationPanelProps) {
+export function VisualizationPanel({
+  step,
+  steps,
+  stepIndex,
+  totalSteps,
+  language,
+  mode,
+  performance,
+}: VisualizationPanelProps) {
   const [showCurrentStep, setShowCurrentStep] = useState(true);
   const [showRuntime, setShowRuntime] = useState(true);
   const [showLanguageModel, setShowLanguageModel] = useState(true);
@@ -340,6 +356,45 @@ export function VisualizationPanel({ step, steps, stepIndex, totalSteps, languag
           <div className="max-h-36 overflow-auto font-mono text-xs text-zinc-100">
             {step.snapshot.stdout.length ? step.snapshot.stdout.map((line, i) => <p key={`${line}-${i}`}>{line}</p>) : <p className="text-zinc-400">No output yet.</p>}
           </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Performance & Suggestions">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <article className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
+            <h4 className="mb-1 text-sm font-semibold text-zinc-100">Estimated Run Time</h4>
+            <p className="font-mono text-sm text-zinc-200">{performance.estimatedRunMs.toFixed(0)} ms</p>
+          </article>
+          <article className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
+            <h4 className="mb-1 text-sm font-semibold text-zinc-100">Simulation Build Time</h4>
+            <p className="font-mono text-sm text-zinc-200">{performance.simulationBuildMs.toFixed(2)} ms</p>
+          </article>
+          <article className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
+            <h4 className="mb-1 text-sm font-semibold text-zinc-100">Last Full Run</h4>
+            <p className="font-mono text-sm text-zinc-200">
+              {performance.lastRunMs === null ? "Not run yet" : `${performance.lastRunMs.toFixed(0)} ms`}
+            </p>
+          </article>
+          <article className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
+            <h4 className="mb-1 text-sm font-semibold text-zinc-100">Memory After Execute</h4>
+            <p className="font-mono text-sm text-zinc-200">{performance.currentMemoryBytes} bytes</p>
+          </article>
+          <article className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
+            <h4 className="mb-1 text-sm font-semibold text-zinc-100">Peak Memory</h4>
+            <p className="font-mono text-sm text-zinc-200">{performance.peakMemoryBytes} bytes</p>
+          </article>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
+          <h4 className="mb-2 text-sm font-semibold text-zinc-100">How You Can Improve</h4>
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-200">
+            {performance.tips.map((tip, index) => (
+              <li key={`${tip}-${index}`}>{tip}</li>
+            ))}
+          </ol>
+          <p className="mt-2 text-xs text-zinc-400">
+            Tip: change code, run again, and compare run time and suggestions.
+          </p>
         </div>
       </SectionCard>
     </section>
