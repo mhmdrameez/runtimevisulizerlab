@@ -127,6 +127,39 @@ function getSimpleExplanation(step: SimulationStep): string[] {
   ];
 }
 
+function getEngineDetail(
+  current: SimulationStep,
+  previous?: SimulationStep,
+  next?: SimulationStep,
+): string[] {
+  const prevStack = previous?.snapshot.callStack.length ?? 0;
+  const currStack = current.snapshot.callStack.length;
+  const prevMemory = previous?.snapshot.memoryHeap.length ?? 0;
+  const currMemory = current.snapshot.memoryHeap.length;
+  const prevMicro = previous?.snapshot.eventLoop.microtasks.length ?? 0;
+  const currMicro = current.snapshot.eventLoop.microtasks.length;
+  const prevMacro = previous?.snapshot.eventLoop.macrotasks.length ?? 0;
+  const currMacro = current.snapshot.eventLoop.macrotasks.length;
+
+  const details: string[] = [];
+  details.push(`JavaScript executes line ${current.line}: ${current.lineExecuted.trim() || "(empty line)"}.`);
+
+  if (currStack > prevStack) details.push("A function was pushed to the Call Stack.");
+  if (currStack < prevStack) details.push("A function finished and was popped from the Call Stack.");
+  if (currMemory > prevMemory) details.push("A new value/function was added to Memory.");
+  if (currMemory < prevMemory) details.push("A memory item was removed or scope ended.");
+  if (currMicro > prevMicro) details.push("A microtask callback was queued.");
+  if (currMacro > prevMacro) details.push("A callback/macrotask was queued.");
+  if (current.snapshot.stdout.length > (previous?.snapshot.stdout.length ?? 0)) {
+    details.push("console.log ran and printed output.");
+  }
+
+  details.push(`Current stack size: ${currStack}, memory items: ${currMemory}.`);
+  details.push(`Queue state now -> microtasks: ${currMicro}, callbacks: ${currMacro}.`);
+  details.push(next ? `Then engine moves to next line: ${next.line}.` : "No next line left. Program execution is complete.");
+  return details;
+}
+
 function getRuntimeLabels(language: SupportedLanguage) {
   if (language === "javascript") {
     return {
@@ -226,6 +259,7 @@ export function VisualizationPanel({
   }
 
   const prevStep = stepIndex > 0 ? steps[stepIndex - 1] : undefined;
+  const nextStep = stepIndex < steps.length - 1 ? steps[stepIndex + 1] : undefined;
   const stackFrames = step.snapshot.callStack.map((frame) => frame.name);
   const memory = step.snapshot.memoryHeap;
   const microtasks = step.snapshot.eventLoop.microtasks;
@@ -234,6 +268,7 @@ export function VisualizationPanel({
   const explanationLines = getSimpleExplanation(step);
   const labels = getRuntimeLabels(language);
   const engineModel = getEngineModel(language, step.snapshot);
+  const detailedEngineSteps = getEngineDetail(step, prevStep, nextStep);
 
   return (
     <section className="flex min-h-0 flex-col gap-3 overflow-auto pr-1">
@@ -357,6 +392,14 @@ export function VisualizationPanel({
             {step.snapshot.stdout.length ? step.snapshot.stdout.map((line, i) => <p key={`${line}-${i}`}>{line}</p>) : <p className="text-zinc-400">No output yet.</p>}
           </div>
         </div>
+      </SectionCard>
+
+      <SectionCard title="Inside JS Engine (Step Details)">
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-200">
+          {detailedEngineSteps.map((line, idx) => (
+            <li key={`${line}-${idx}`}>{line}</li>
+          ))}
+        </ol>
       </SectionCard>
 
       <SectionCard title="Performance & Suggestions">

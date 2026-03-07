@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeEditorPanel } from "@/components/CodeEditor/code-editor-panel";
 import { ControlsBar } from "@/components/Controls/controls-bar";
 import { VisualizationPanel } from "@/components/Visualization/visualization-panel";
@@ -38,11 +38,14 @@ export function SimulatorWorkbench() {
   const [mode, setMode] = useState<VisualizationMode>("beginner");
   const [code, setCode] = useState(DEFAULT_CODE);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [narrationEnabled, setNarrationEnabled] = useState(false);
+  const [syncWithNarration, setSyncWithNarration] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [lastRunMs, setLastRunMs] = useState<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const runStartRef = useRef<number | null>(null);
+  const lastNarratedStepIdRef = useRef<string | null>(null);
 
   const { steps, error } = useMemo(() => {
     return simulateRuntime(language, code);
@@ -65,10 +68,39 @@ export function SimulatorWorkbench() {
     }
   };
 
+  const stopSpeech = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
+  const finishRunIfNeeded = useCallback(() => {
+    setIsRunning(false);
+    if (runStartRef.current !== null) {
+      setLastRunMs(performance.now() - runStartRef.current);
+      runStartRef.current = null;
+    }
+  }, []);
+
+  const speakText = useCallback((text: string, onDone?: () => void) => {
+    if (!narrationEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) {
+      onDone?.();
+      return;
+    }
+
+    stopSpeech();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = Math.min(1.4, Math.max(0.75, playbackSpeed));
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.onend = () => onDone?.();
+    window.speechSynthesis.speak(utterance);
+  }, [narrationEnabled, playbackSpeed, stopSpeech]);
+
   useEffect(() => {
     clearPlaybackTimer();
 
-    if (!isRunning || steps.length === 0) {
+    if (!isRunning || steps.length === 0 || (narrationEnabled && syncWithNarration)) {
       return;
     }
 
@@ -80,20 +112,54 @@ export function SimulatorWorkbench() {
       setStepIndex((current) => {
         const next = Math.min(current + 1, steps.length - 1);
         if (next >= steps.length - 1) {
-          setIsRunning(false);
-          if (runStartRef.current !== null) {
-            setLastRunMs(performance.now() - runStartRef.current);
-            runStartRef.current = null;
-          }
+          finishRunIfNeeded();
         }
         return next;
       });
     }, PLAYBACK_MS / playbackSpeed);
 
     return clearPlaybackTimer;
-  }, [isRunning, stepIndex, steps.length, playbackSpeed]);
+  }, [isRunning, stepIndex, steps.length, playbackSpeed, narrationEnabled, syncWithNarration, finishRunIfNeeded]);
 
   useEffect(() => clearPlaybackTimer, []);
+
+  useEffect(() => {
+    if (!isRunning || !narrationEnabled || !syncWithNarration || !currentStep) {
+      return;
+    }
+
+    if (lastNarratedStepIdRef.current === currentStep.id) {
+      return;
+    }
+    lastNarratedStepIdRef.current = currentStep.id;
+
+    speakText(`Step ${stepIndex + 1}. ${currentStep.details}`, () => {
+      setStepIndex((current) => {
+        if (current >= steps.length - 1) {
+          finishRunIfNeeded();
+          return current;
+        }
+
+        const next = current + 1;
+        if (next >= steps.length - 1) {
+          finishRunIfNeeded();
+        }
+        return next;
+      });
+    });
+  }, [isRunning, narrationEnabled, syncWithNarration, currentStep, stepIndex, steps.length, finishRunIfNeeded, speakText]);
+
+  useEffect(() => {
+    if (!isRunning || !narrationEnabled || syncWithNarration || !currentStep) {
+      return;
+    }
+
+    if (lastNarratedStepIdRef.current === currentStep.id) {
+      return;
+    }
+    lastNarratedStepIdRef.current = currentStep.id;
+    speakText(`Step ${stepIndex + 1}. ${currentStep.details}`);
+  }, [isRunning, narrationEnabled, syncWithNarration, currentStep, stepIndex, speakText]);
 
   const onRun = () => {
     if (steps.length === 0) {
@@ -105,6 +171,7 @@ export function SimulatorWorkbench() {
     }
 
     runStartRef.current = performance.now();
+    lastNarratedStepIdRef.current = null;
     setIsRunning(true);
   };
 
@@ -112,11 +179,13 @@ export function SimulatorWorkbench() {
     clearPlaybackTimer();
     setIsRunning(false);
     runStartRef.current = null;
+    stopSpeech();
   };
 
   const onStepForward = () => {
     clearPlaybackTimer();
     setIsRunning(false);
+    stopSpeech();
     setStepIndex((current) => Math.min(current + 1, steps.length - 1));
   };
 
@@ -125,6 +194,8 @@ export function SimulatorWorkbench() {
     setIsRunning(false);
     setStepIndex(0);
     runStartRef.current = null;
+    lastNarratedStepIdRef.current = null;
+    stopSpeech();
   };
 
   const onClear = () => {
@@ -134,6 +205,15 @@ export function SimulatorWorkbench() {
     setCode(EMPTY_CODE);
     runStartRef.current = null;
     setLastRunMs(null);
+    lastNarratedStepIdRef.current = null;
+    stopSpeech();
+  };
+
+  const onExplainStep = () => {
+    if (!currentStep) {
+      return;
+    }
+    speakText(`Current line ${currentStep.line}. ${currentStep.lineExecuted}. ${currentStep.details}`);
   };
 
   return (
@@ -162,6 +242,24 @@ export function SimulatorWorkbench() {
           onStepForward={onStepForward}
           onReset={onReset}
           onClear={onClear}
+          onExplainStep={onExplainStep}
+          narrationEnabled={narrationEnabled}
+          onToggleNarration={() => {
+            setNarrationEnabled((current) => {
+              const next = !current;
+              if (!next) {
+                stopSpeech();
+                setSyncWithNarration(false);
+              }
+              lastNarratedStepIdRef.current = null;
+              return next;
+            });
+          }}
+          syncWithNarration={syncWithNarration}
+          onToggleSyncWithNarration={() => {
+            setSyncWithNarration((current) => !current);
+            lastNarratedStepIdRef.current = null;
+          }}
           speed={playbackSpeed}
           onSpeedChange={setPlaybackSpeed}
           running={isRunning}

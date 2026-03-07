@@ -6,6 +6,11 @@ interface ControlsBarProps {
   onPause: () => void;
   onReset: () => void;
   onClear: () => void;
+  onExplainStep: () => void;
+  narrationEnabled: boolean;
+  onToggleNarration: () => void;
+  syncWithNarration: boolean;
+  onToggleSyncWithNarration: () => void;
   speed: number;
   onSpeedChange: (value: number) => void;
   running: boolean;
@@ -51,6 +56,11 @@ export function ControlsBar({
   onPause,
   onReset,
   onClear,
+  onExplainStep,
+  narrationEnabled,
+  onToggleNarration,
+  syncWithNarration,
+  onToggleSyncWithNarration,
   speed,
   onSpeedChange,
   running,
@@ -66,6 +76,17 @@ export function ControlsBar({
       <ControlButton label="Pause" onClick={onPause} variant="warn" disabled={!running} />
       <ControlButton label="Reset" onClick={onReset} disabled={stepIndex === 0 && !running} />
       <ControlButton label="Clear" onClick={onClear} disabled={!canClear} />
+      <ControlButton label="Explain Step" onClick={onExplainStep} disabled={totalSteps === 0} />
+      <ControlButton
+        label={narrationEnabled ? "Voice On" : "Voice Off"}
+        onClick={onToggleNarration}
+        variant={narrationEnabled ? "primary" : "neutral"}
+      />
+      <ControlButton
+        label={syncWithNarration ? "Sync Voice On" : "Sync Voice Off"}
+        onClick={onToggleSyncWithNarration}
+        disabled={!narrationEnabled}
+      />
 
       <label className="ml-2 flex items-center gap-2 text-xs text-zinc-300">
         <span>Speed</span>
