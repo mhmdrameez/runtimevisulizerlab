@@ -2,7 +2,7 @@
 
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { SupportedLanguage } from "@/types/simulator";
 
@@ -31,10 +31,21 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const decorationsRef = useRef<string[]>([]);
+  const [inlineEditorError, setInlineEditorError] = useState<string>("");
 
   const onMount: OnMount = (editorInstance, monaco) => {
     editorRef.current = editorInstance;
     monacoRef.current = monaco;
+
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+    });
+    monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+      allowNonTsExtensions: true,
+      checkJs: true,
+      target: monaco.languages.typescript.ScriptTarget.ES2022,
+    });
 
     monaco.editor.defineTheme("engine-lab", {
       base: "vs-dark",
@@ -54,6 +65,18 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
     });
 
     monaco.editor.setTheme("engine-lab");
+  };
+
+  const getErrorLocation = (error: string): { line: number; column: number } | null => {
+    const match = error.match(/\((\d+):(\d+)\)/);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      line: Number(match[1]),
+      column: Number(match[2]) + 1,
+    };
   };
 
   useEffect(() => {
@@ -77,6 +100,77 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
 
     editorInstance.revealLineInCenter(activeLine);
   }, [activeLine]);
+
+  useEffect(() => {
+    const editorInstance = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editorInstance || !monaco) {
+      return;
+    }
+
+    const model = editorInstance.getModel();
+    if (!model) {
+      return;
+    }
+
+    if (!parseError) {
+      monaco.editor.setModelMarkers(model, "runtime-parse", []);
+      return;
+    }
+
+    const position = getErrorLocation(parseError) ?? { line: 1, column: 1 };
+    const safeLine = Math.min(Math.max(position.line, 1), model.getLineCount());
+    const safeColumn = Math.min(Math.max(position.column, 1), model.getLineMaxColumn(safeLine));
+
+    monaco.editor.setModelMarkers(model, "runtime-parse", [
+      {
+        severity: monaco.MarkerSeverity.Error,
+        message: parseError,
+        startLineNumber: safeLine,
+        startColumn: safeColumn,
+        endLineNumber: safeLine,
+        endColumn: Math.min(safeColumn + 1, model.getLineMaxColumn(safeLine)),
+      },
+    ]);
+  }, [parseError]);
+
+  useEffect(() => {
+    const editorInstance = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editorInstance || !monaco) {
+      return;
+    }
+
+    const model = editorInstance.getModel();
+    if (!model) {
+      return;
+    }
+
+    const refreshInlineError = () => {
+      const markers = monaco.editor
+        .getModelMarkers({ resource: model.uri })
+        .filter((marker) => marker.severity === monaco.MarkerSeverity.Error)
+        .sort((a, b) =>
+          a.startLineNumber === b.startLineNumber
+            ? a.startColumn - b.startColumn
+            : a.startLineNumber - b.startLineNumber,
+        );
+
+      const first = markers[0];
+      if (!first) {
+        setInlineEditorError("");
+        return;
+      }
+
+      const lineText = model.getLineContent(first.startLineNumber).trim() || "(empty line)";
+      const compactMessage = first.message.replace(/\s+/g, " ").trim();
+      setInlineEditorError(`${lineText}   // error: ${compactMessage}`);
+    };
+
+    refreshInlineError();
+    const disposable = monaco.editor.onDidChangeMarkers(() => refreshInlineError());
+    return () => disposable.dispose();
+  }, [code, language, parseError]);
 
   return (
     <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#0b1220]">
@@ -104,10 +198,18 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
       </div>
 
       {parseError ? (
-        <p className="border-t border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">Parse error: {parseError}</p>
+        <p className="border-t border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">Live error: {parseError}</p>
       ) : (
-        <p className="border-t border-zinc-700 px-3 py-2 text-xs text-zinc-400">Code changes auto-parse and regenerate simulation steps.</p>
+        <p className="border-t border-zinc-700 px-3 py-2 text-xs text-zinc-400">
+          Real-time syntax and code errors show directly on the editor line.
+        </p>
       )}
+
+      {inlineEditorError ? (
+        <p className="border-t border-red-300/30 bg-red-500/8 px-3 py-2 font-mono text-xs text-red-200">
+          {inlineEditorError}
+        </p>
+      ) : null}
     </section>
   );
 }
