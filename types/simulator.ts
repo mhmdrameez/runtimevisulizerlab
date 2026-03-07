@@ -29,12 +29,15 @@ export interface SimulationSnapshot {
   memoryHeap: MemoryEntry[];
   executionContext: ExecutionContextView;
   eventLoop: EventLoopState;
+  webApis: string[];
   stdout: string[];
   activeLine: number;
 }
 
 export interface SimulationStep {
   id: string;
+  line: number;
+  lineExecuted: string;
   title: string;
   details: string;
   snapshot: SimulationSnapshot;

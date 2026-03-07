@@ -15,6 +15,7 @@ interface RuntimeState {
     microtasks: string[];
     macrotasks: string[];
   };
+  webApis: string[];
   stdout: string[];
   contextVariables: string[];
   contextName: string;
@@ -44,6 +45,7 @@ function makeInitialState(): RuntimeState {
       microtasks: [],
       macrotasks: [],
     },
+    webApis: [],
     stdout: [],
     contextVariables: [],
     contextName: "Global",
@@ -65,6 +67,7 @@ function snapshot(state: RuntimeState): SimulationSnapshot {
       microtasks: [...state.eventLoop.microtasks],
       macrotasks: [...state.eventLoop.macrotasks],
     },
+    webApis: [...state.webApis],
     stdout: [...state.stdout],
     activeLine: state.activeLine,
   };
@@ -136,7 +139,17 @@ function evaluateExpression(value: string, scope: Scope): string {
   return expression;
 }
 
-export function buildSimulationSteps(program: ParsedProgram): SimulationStep[] {
+function getLineText(source: string, line: number): string {
+  const text = source.split(/\r?\n/)[line - 1] ?? "";
+  return text.trim() || "(empty line)";
+}
+
+function isWebApiLabel(label: string): boolean {
+  const text = label.toLowerCase();
+  return text.includes("settimeout") || text.includes("fetch") || text.includes("dom");
+}
+
+export function buildSimulationSteps(program: ParsedProgram, source = ""): SimulationStep[] {
   const state = makeInitialState();
   const steps: SimulationStep[] = [];
   const scope: Scope = {
@@ -149,6 +162,8 @@ export function buildSimulationSteps(program: ParsedProgram): SimulationStep[] {
     state.activeLine = line;
     steps.push({
       id: `step-${steps.length + 1}`,
+      line,
+      lineExecuted: getLineText(source, line),
       title,
       details,
       snapshot: snapshot(state),
@@ -291,6 +306,15 @@ export function buildSimulationSteps(program: ParsedProgram): SimulationStep[] {
           break;
         }
         case "asyncTask": {
+          if (isWebApiLabel(operation.label) && !state.webApis.includes(operation.label)) {
+            state.webApis.push(operation.label);
+            pushStep(
+              "Web API Registered",
+              `${operation.label} is now handled by Web APIs.`,
+              operation.line,
+            );
+          }
+
           tasks.push({
             queue: operation.queue,
             label: operation.label,
@@ -347,6 +371,7 @@ export function buildSimulationSteps(program: ParsedProgram): SimulationStep[] {
     } else {
       state.eventLoop.macrotasks = state.eventLoop.macrotasks.filter((name) => name !== task.label);
     }
+    state.webApis = state.webApis.filter((name) => name !== task.label);
 
     pushStep(
       "Event Loop Tick",

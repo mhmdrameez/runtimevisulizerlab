@@ -33,7 +33,7 @@ export function SimulatorWorkbench() {
   const { steps, parseError } = useMemo(() => {
     const parsed = parseJavaScript(code);
     return {
-      steps: buildSimulationSteps(parsed.program),
+      steps: buildSimulationSteps(parsed.program, code),
       parseError: parsed.error,
     };
   }, [code]);
@@ -138,7 +138,7 @@ export function SimulatorWorkbench() {
             activeLine={currentStep?.snapshot.activeLine ?? 1}
             parseError={parseError}
           />
-          <VisualizationPanel step={currentStep} stepIndex={stepIndex} totalSteps={steps.length} />
+          <VisualizationPanel step={currentStep} steps={steps} stepIndex={stepIndex} totalSteps={steps.length} />
         </section>
       </div>
     </main>

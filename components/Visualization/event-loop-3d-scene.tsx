@@ -12,9 +12,13 @@ interface EventLoopThreeSceneProps {
   callStack: string[];
   microtasks: string[];
   macrotasks: string[];
+  webApis: string[];
   hasConsoleOutput: boolean;
   phase: Phase;
   heightClassName?: string;
+  executionContextName: string;
+  executionPhase: "creation" | "execution";
+  executionBindings: string[];
 }
 
 function NodeBox({
@@ -22,11 +26,13 @@ function NodeBox({
   color,
   title,
   subtitle,
+  lines = [],
 }: {
   position: [number, number, number];
   color: string;
   title: string;
   subtitle?: string;
+  lines?: string[];
 }) {
   return (
     <group position={position}>
@@ -42,6 +48,20 @@ function NodeBox({
           {subtitle}
         </Text>
       ) : null}
+      {lines.slice(0, 3).map((line, index) => (
+        <Text
+          key={`${title}-${line}-${index}`}
+          position={[-1.42, -0.46 - index * 0.18, 0.4]}
+          fontSize={0.12}
+          color="#e2e8f0"
+          anchorX="left"
+          anchorY="middle"
+          outlineWidth={0.006}
+          outlineColor="#020617"
+        >
+          {`- ${line}`}
+        </Text>
+      ))}
     </group>
   );
 }
@@ -128,7 +148,18 @@ function FlowPulse({
   );
 }
 
-function SceneContent({ stepId, callStack, microtasks, macrotasks, hasConsoleOutput, phase }: EventLoopThreeSceneProps) {
+function SceneContent({
+  stepId,
+  callStack,
+  microtasks,
+  macrotasks,
+  webApis,
+  hasConsoleOutput,
+  phase,
+  executionContextName,
+  executionPhase,
+  executionBindings,
+}: EventLoopThreeSceneProps) {
   const apiToMacro = useMemo(
     () =>
       new THREE.CatmullRomCurve3([
@@ -201,11 +232,42 @@ function SceneContent({ stepId, callStack, microtasks, macrotasks, hasConsoleOut
         <meshStandardMaterial color="#0c1427" roughness={0.9} metalness={0.08} />
       </mesh>
 
-      <NodeBox position={[-4.8, 1.15, 0]} color="#f59e0b" title="Call Stack" subtitle={`${callStack.length} frame(s)`} />
-      <NodeBox position={[0, 1.15, 0]} color="#22c55e" title="Callback Queue" subtitle={`${macrotasks.length}`} />
-      <NodeBox position={[0, -0.02, 0]} color="#10b981" title="Priority Queue" subtitle={`${microtasks.length}`} />
-      <NodeBox position={[4.8, 1.15, 0]} color="#fb7185" title="Web APIs" subtitle="setTimeout / DOM / fetch" />
+      <NodeBox
+        position={[-4.8, 1.15, 0]}
+        color="#f59e0b"
+        title="Call Stack"
+        subtitle={`${callStack.length} frame(s)`}
+        lines={callStack.length ? [...callStack].reverse() : ["(empty)"]}
+      />
+      <NodeBox
+        position={[0, 1.15, 0]}
+        color="#22c55e"
+        title="Callback Queue"
+        subtitle={`${macrotasks.length}`}
+        lines={macrotasks.length ? macrotasks : ["(empty)"]}
+      />
+      <NodeBox
+        position={[0, -0.02, 0]}
+        color="#10b981"
+        title="Priority Queue"
+        subtitle={`${microtasks.length}`}
+        lines={microtasks.length ? microtasks : ["(empty)"]}
+      />
+      <NodeBox
+        position={[4.8, 1.15, 0]}
+        color="#fb7185"
+        title="Web APIs"
+        subtitle={`${webApis.length} active`}
+        lines={webApis.length ? webApis : ["(idle)"]}
+      />
       <NodeBox position={[0, -1.6, 0]} color="#0ea5e9" title="Console" subtitle={hasConsoleOutput ? "visible" : "waiting"} />
+      <NodeBox
+        position={[4.8, -1.2, 0]}
+        color="#8b5cf6"
+        title="Execution Context"
+        subtitle={`${executionContextName} (${executionPhase})`}
+        lines={executionBindings.length ? executionBindings : ["(no bindings)"]}
+      />
 
       <ArrowPath points={[[4.2, 1.15, 0.25], [2.2, 1.9, 0.25], [0.9, 1.15, 0.25]]} color="#fbbf24" label="enqueue" />
       <ArrowPath points={[[4.2, 1.1, 0.2], [2.2, 0.15, 0.2], [0.9, -0.02, 0.2]]} color="#34d399" label="priority" />

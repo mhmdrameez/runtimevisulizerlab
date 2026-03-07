@@ -221,6 +221,16 @@ function parseCallExpression(
     };
   }
 
+  if (expression.callee.type === "Identifier" && expression.callee.name === "fetch") {
+    return {
+      type: "asyncTask",
+      queue: "macrotask",
+      label: "fetch callback",
+      body: [],
+      line,
+    };
+  }
+
   if (
     expression.callee.type === "Identifier" &&
     expression.callee.name === "queueMicrotask"
@@ -251,6 +261,29 @@ function parseCallExpression(
         }
         return valueFromExpression(arg as Expression, source);
       }),
+      line,
+    };
+  }
+
+  if (
+    expression.callee.type === "MemberExpression" &&
+    expression.callee.object.type === "Identifier" &&
+    expression.callee.object.name === "document" &&
+    expression.callee.property.type === "Identifier" &&
+    expression.callee.property.name === "addEventListener"
+  ) {
+    const callback = expression.arguments[1];
+    const callbackBody =
+      callback &&
+      (callback.type === "ArrowFunctionExpression" || callback.type === "FunctionExpression")
+        ? parseFunctionExpressionBody(callback, source)
+        : [];
+
+    return {
+      type: "asyncTask",
+      queue: "macrotask",
+      label: "DOM event callback",
+      body: callbackBody,
       line,
     };
   }
