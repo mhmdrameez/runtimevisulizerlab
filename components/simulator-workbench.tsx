@@ -25,6 +25,7 @@ setTimeout(() => {
 const EMPTY_CODE = "";
 
 const PLAYBACK_MS = 900;
+const AUTO_RUN_DEBOUNCE_MS = 850;
 
 function estimateHeapBytes(memory: Array<{ key: string; value: string; scope: string }>): number {
   return memory.reduce((total, item) => {
@@ -38,6 +39,7 @@ export function SimulatorWorkbench() {
   const [mode, setMode] = useState<VisualizationMode>("beginner");
   const [code, setCode] = useState(DEFAULT_CODE);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [autoRunOnType, setAutoRunOnType] = useState(false);
   const [narrationEnabled, setNarrationEnabled] = useState(true);
   const syncWithNarration = true;
   const [isRunning, setIsRunning] = useState(false);
@@ -46,6 +48,8 @@ export function SimulatorWorkbench() {
   const timerRef = useRef<number | null>(null);
   const runStartRef = useRef<number | null>(null);
   const lastNarratedStepIdRef = useRef<string | null>(null);
+  const autoRunDebounceRef = useRef<number | null>(null);
+  const lastAutoRunCodeRef = useRef<string>("");
 
   const { steps, error } = useMemo(() => {
     return simulateRuntime(language, code);
@@ -66,6 +70,27 @@ export function SimulatorWorkbench() {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+  };
+
+  const clearAutoRunDebounce = () => {
+    if (autoRunDebounceRef.current !== null) {
+      window.clearTimeout(autoRunDebounceRef.current);
+      autoRunDebounceRef.current = null;
+    }
+  };
+
+  const isLineCompleteForAutoRun = (source: string): boolean => {
+    const trimmedEnd = source.trimEnd();
+    if (!trimmedEnd) {
+      return false;
+    }
+
+    const lastChar = trimmedEnd.at(-1) ?? "";
+    if ([";", "}", ")"].includes(lastChar)) {
+      return true;
+    }
+
+    return /\n\s*$/.test(source);
   };
 
   const stopSpeech = useCallback(() => {
@@ -161,7 +186,7 @@ export function SimulatorWorkbench() {
     speakText(`Step ${stepIndex + 1}. ${currentStep.details}`);
   }, [isRunning, narrationEnabled, syncWithNarration, currentStep, stepIndex, speakText]);
 
-  const onRun = () => {
+  const onRun = useCallback(() => {
     if (steps.length === 0) {
       return;
     }
@@ -173,7 +198,7 @@ export function SimulatorWorkbench() {
     runStartRef.current = performance.now();
     lastNarratedStepIdRef.current = null;
     setIsRunning(true);
-  };
+  }, [steps.length, stepIndex]);
 
   const onPause = () => {
     clearPlaybackTimer();
@@ -189,17 +214,18 @@ export function SimulatorWorkbench() {
     setStepIndex((current) => Math.min(current + 1, steps.length - 1));
   };
 
-  const onReset = () => {
+  const onReset = useCallback(() => {
     clearPlaybackTimer();
     setIsRunning(false);
     setStepIndex(0);
     runStartRef.current = null;
     lastNarratedStepIdRef.current = null;
     stopSpeech();
-  };
+  }, [stopSpeech]);
 
   const onClear = () => {
     clearPlaybackTimer();
+    clearAutoRunDebounce();
     setIsRunning(false);
     setStepIndex(0);
     setCode(EMPTY_CODE);
@@ -215,6 +241,49 @@ export function SimulatorWorkbench() {
     }
     speakText(`Current line ${currentStep.line}. ${currentStep.lineExecuted}. ${currentStep.details}`);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        onRun();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onRun]);
+
+  useEffect(() => {
+    clearAutoRunDebounce();
+    if (!autoRunOnType) {
+      return;
+    }
+    if (isRunning || code.trim().length === 0 || steps.length === 0 || error) {
+      return;
+    }
+
+    if (lastAutoRunCodeRef.current === code) {
+      return;
+    }
+
+    if (!isLineCompleteForAutoRun(code)) {
+      return;
+    }
+
+    autoRunDebounceRef.current = window.setTimeout(() => {
+      if (lastAutoRunCodeRef.current === code) {
+        return;
+      }
+      lastAutoRunCodeRef.current = code;
+      onReset();
+      runStartRef.current = performance.now();
+      lastNarratedStepIdRef.current = null;
+      setIsRunning(true);
+    }, AUTO_RUN_DEBOUNCE_MS);
+
+    return clearAutoRunDebounce;
+  }, [code, autoRunOnType, steps.length, error, isRunning, onReset]);
 
   return (
     <main className="h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_top,#162039_0%,#0d111c_42%,#090c13_100%)] px-4 py-4 text-zinc-100 sm:px-6">
@@ -243,6 +312,12 @@ export function SimulatorWorkbench() {
           onReset={onReset}
           onClear={onClear}
           onExplainStep={onExplainStep}
+          autoRunOnType={autoRunOnType}
+          onToggleAutoRunOnType={() => {
+            clearAutoRunDebounce();
+            lastAutoRunCodeRef.current = "";
+            setAutoRunOnType((current) => !current);
+          }}
           narrationEnabled={narrationEnabled}
           onToggleNarration={() => {
             setNarrationEnabled((current) => {
@@ -268,6 +343,7 @@ export function SimulatorWorkbench() {
             code={code}
             onChange={(value) => {
               clearPlaybackTimer();
+              clearAutoRunDebounce();
               setIsRunning(false);
               setStepIndex(0);
               setCode(value);

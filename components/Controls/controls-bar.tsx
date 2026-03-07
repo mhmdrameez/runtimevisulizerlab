@@ -7,6 +7,8 @@ interface ControlsBarProps {
   onReset: () => void;
   onClear: () => void;
   onExplainStep: () => void;
+  autoRunOnType: boolean;
+  onToggleAutoRunOnType: () => void;
   narrationEnabled: boolean;
   onToggleNarration: () => void;
   speed: number;
@@ -55,6 +57,8 @@ export function ControlsBar({
   onReset,
   onClear,
   onExplainStep,
+  autoRunOnType,
+  onToggleAutoRunOnType,
   narrationEnabled,
   onToggleNarration,
   speed,
@@ -73,6 +77,11 @@ export function ControlsBar({
       <ControlButton label="Reset" onClick={onReset} disabled={stepIndex === 0 && !running} />
       <ControlButton label="Clear" onClick={onClear} disabled={!canClear} />
       <ControlButton label="Explain Step" onClick={onExplainStep} disabled={totalSteps === 0} />
+      <ControlButton
+        label={autoRunOnType ? "Auto Run On" : "Auto Run Off"}
+        onClick={onToggleAutoRunOnType}
+        variant={autoRunOnType ? "primary" : "neutral"}
+      />
       <ControlButton
         label={narrationEnabled ? "Voice On" : "Voice Off"}
         onClick={onToggleNarration}
@@ -95,6 +104,9 @@ export function ControlsBar({
 
       <p className="ml-auto rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
         Step {Math.min(stepIndex + 1, Math.max(totalSteps, 1))} / {Math.max(totalSteps, 1)}
+      </p>
+      <p className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-400">
+        Run shortcut: Ctrl/Cmd + Enter
       </p>
     </div>
   );
