@@ -39,7 +39,7 @@ export function SimulatorWorkbench() {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [narrationEnabled, setNarrationEnabled] = useState(true);
-  const [syncWithNarration, setSyncWithNarration] = useState(false);
+  const syncWithNarration = true;
   const [isRunning, setIsRunning] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [lastRunMs, setLastRunMs] = useState<number | null>(null);
@@ -249,16 +249,10 @@ export function SimulatorWorkbench() {
               const next = !current;
               if (!next) {
                 stopSpeech();
-                setSyncWithNarration(false);
               }
               lastNarratedStepIdRef.current = null;
               return next;
             });
-          }}
-          syncWithNarration={syncWithNarration}
-          onToggleSyncWithNarration={() => {
-            setSyncWithNarration((current) => !current);
-            lastNarratedStepIdRef.current = null;
           }}
           speed={playbackSpeed}
           onSpeedChange={setPlaybackSpeed}

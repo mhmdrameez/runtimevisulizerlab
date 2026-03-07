@@ -16,8 +16,36 @@ const ibmMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "JavaScript Engine Lab",
-  description: "Interactive visual simulator for JavaScript execution internals.",
+  metadataBase: new URL("https://inside-js.vercel.app"),
+  title: {
+    default: "INSIDE JS",
+    template: "%s | INSIDE JS",
+  },
+  description: "A simple lab to understand JavaScript runtime with step-by-step execution visualization.",
+  applicationName: "INSIDE JS",
+  keywords: [
+    "JavaScript runtime",
+    "call stack",
+    "event loop",
+    "memory heap",
+    "JavaScript visualizer",
+  ],
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: "INSIDE JS",
+    description: "A simple lab to understand JavaScript runtime with step-by-step execution visualization.",
+    type: "website",
+    locale: "en_US",
+    siteName: "INSIDE JS",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "INSIDE JS",
+    description: "A simple lab to understand JavaScript runtime with step-by-step execution visualization.",
+  },
 };
 
 export default function RootLayout({

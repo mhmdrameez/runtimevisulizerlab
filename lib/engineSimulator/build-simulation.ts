@@ -139,8 +139,8 @@ function evaluateExpression(value: string, scope: Scope): string {
   return expression;
 }
 
-function getLineText(source: string, line: number): string {
-  const text = source.split(/\r?\n/)[line - 1] ?? "";
+function getLineText(lines: string[], line: number): string {
+  const text = lines[line - 1] ?? "";
   return text.trim() || "(empty line)";
 }
 
@@ -150,6 +150,7 @@ function isWebApiLabel(label: string): boolean {
 }
 
 export function buildSimulationSteps(program: ParsedProgram, source = ""): SimulationStep[] {
+  const sourceLines = source.split(/\r?\n/);
   const state = makeInitialState();
   const steps: SimulationStep[] = [];
   const scope: Scope = {
@@ -163,7 +164,7 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
     steps.push({
       id: `step-${steps.length + 1}`,
       line,
-      lineExecuted: getLineText(source, line),
+      lineExecuted: getLineText(sourceLines, line),
       title,
       details,
       snapshot: snapshot(state),
