@@ -4,14 +4,30 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useEffect, useRef } from "react";
 
+import type { SupportedLanguage } from "@/types/simulator";
+
 interface CodeEditorPanelProps {
   code: string;
   onChange: (value: string) => void;
   activeLine: number;
+  language: SupportedLanguage;
   parseError?: string;
 }
 
-export function CodeEditorPanel({ code, onChange, activeLine, parseError }: CodeEditorPanelProps) {
+function getEditorLabel(language: SupportedLanguage): string {
+  const extMap: Record<SupportedLanguage, string> = {
+    javascript: "js",
+    python: "py",
+    go: "go",
+    java: "java",
+    c: "c",
+    cpp: "cpp",
+  };
+
+  return `editor.${extMap[language]}`;
+}
+
+export function CodeEditorPanel({ code, onChange, activeLine, language, parseError }: CodeEditorPanelProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -65,13 +81,13 @@ export function CodeEditorPanel({ code, onChange, activeLine, parseError }: Code
   return (
     <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#0b1220]">
       <div className="flex items-center justify-between border-b border-zinc-700 px-3 py-2 text-xs text-zinc-300">
-        <span>editor.js</span>
+        <span>{getEditorLabel(language)}</span>
         <span className="rounded bg-zinc-800 px-2 py-1 text-[11px] text-zinc-400">Monaco</span>
       </div>
 
       <div className="min-h-0 flex-1">
         <Editor
-          defaultLanguage="javascript"
+          language={language}
           value={code}
           onChange={(value) => onChange(value ?? "")}
           onMount={onMount}

@@ -5,10 +5,14 @@ interface ControlsBarProps {
   onStepForward: () => void;
   onPause: () => void;
   onReset: () => void;
+  onClear: () => void;
+  speed: number;
+  onSpeedChange: (value: number) => void;
   running: boolean;
   canStep: boolean;
   stepIndex: number;
   totalSteps: number;
+  canClear: boolean;
 }
 
 function ControlButton({
@@ -46,10 +50,14 @@ export function ControlsBar({
   onStepForward,
   onPause,
   onReset,
+  onClear,
+  speed,
+  onSpeedChange,
   running,
   canStep,
   stepIndex,
   totalSteps,
+  canClear,
 }: ControlsBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-zinc-700/70 px-4 py-3">
@@ -57,6 +65,21 @@ export function ControlsBar({
       <ControlButton label="Step Forward" onClick={onStepForward} disabled={!canStep} />
       <ControlButton label="Pause" onClick={onPause} variant="warn" disabled={!running} />
       <ControlButton label="Reset" onClick={onReset} disabled={stepIndex === 0 && !running} />
+      <ControlButton label="Clear" onClick={onClear} disabled={!canClear} />
+
+      <label className="ml-2 flex items-center gap-2 text-xs text-zinc-300">
+        <span>Speed</span>
+        <input
+          type="range"
+          min={0.5}
+          max={3}
+          step={0.1}
+          value={speed}
+          onChange={(event) => onSpeedChange(Number(event.target.value))}
+          className="h-1.5 w-28 cursor-pointer accent-cyan-400"
+        />
+        <span className="w-9 text-right font-mono">{speed.toFixed(1)}x</span>
+      </label>
 
       <p className="ml-auto rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
         Step {Math.min(stepIndex + 1, Math.max(totalSteps, 1))} / {Math.max(totalSteps, 1)}

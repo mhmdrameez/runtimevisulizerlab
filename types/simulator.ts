@@ -1,4 +1,6 @@
 export type QueueType = "microtask" | "macrotask";
+export type SupportedLanguage = "javascript" | "python" | "go" | "java" | "c" | "cpp";
+export type VisualizationMode = "beginner" | "advanced";
 
 export interface StackFrame {
   id: string;
