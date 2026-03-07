@@ -38,7 +38,7 @@ export function SimulatorWorkbench() {
   const [mode, setMode] = useState<VisualizationMode>("beginner");
   const [code, setCode] = useState(DEFAULT_CODE);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [narrationEnabled, setNarrationEnabled] = useState(false);
+  const [narrationEnabled, setNarrationEnabled] = useState(true);
   const [syncWithNarration, setSyncWithNarration] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
