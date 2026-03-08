@@ -53,7 +53,7 @@ export function SimulatorWorkbench() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [autoRunOnType, setAutoRunOnType] = useState(false);
   const [narrationEnabled, setNarrationEnabled] = useState(true);
-  const syncWithNarration = true;
+  const syncWithNarration = false;
   const [isRunning, setIsRunning] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [lastRunMs, setLastRunMs] = useState<number | null>(null);
@@ -77,12 +77,25 @@ export function SimulatorWorkbench() {
   const performanceTips = useMemo(() => buildPerformanceTips(code), [code]);
   const estimatedRunMs = Math.max(0, (steps.length - 1) * (PLAYBACK_MS / playbackSpeed));
 
-  const currentStep = steps[Math.min(stepIndex, Math.max(steps.length - 1, 0))];
-  const currentMemoryBytes = currentStep ? estimateHeapBytes(currentStep.snapshot.memoryHeap) : 0;
-  const peakMemoryBytes = steps.reduce((peak, s) => {
-    const bytes = estimateHeapBytes(s.snapshot.memoryHeap);
-    return Math.max(peak, bytes);
-  }, 0);
+  const safeStepIndex = Math.min(stepIndex, Math.max(steps.length - 1, 0));
+  const currentStep = steps[safeStepIndex];
+  const memoryBytesByStep = useMemo(() => {
+    return steps.map((step) => estimateHeapBytes(step.snapshot.memoryHeap));
+  }, [steps]);
+  const currentMemoryBytes = memoryBytesByStep[safeStepIndex] ?? 0;
+  const peakMemoryBytes = useMemo(() => {
+    return memoryBytesByStep.length ? Math.max(...memoryBytesByStep) : 0;
+  }, [memoryBytesByStep]);
+  const performanceData = useMemo(() => {
+    return {
+      estimatedRunMs,
+      simulationBuildMs,
+      lastRunMs,
+      currentMemoryBytes,
+      peakMemoryBytes,
+      tips: performanceTips,
+    };
+  }, [estimatedRunMs, simulationBuildMs, lastRunMs, currentMemoryBytes, peakMemoryBytes, performanceTips]);
 
   const clearPlaybackTimer = () => {
     if (timerRef.current !== null) {
@@ -336,6 +349,20 @@ export function SimulatorWorkbench() {
     };
   }, [language, code, error, steps]);
 
+  const handleCodeChange = useCallback((value: string) => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (autoRunDebounceRef.current !== null) {
+      window.clearTimeout(autoRunDebounceRef.current);
+      autoRunDebounceRef.current = null;
+    }
+    setIsRunning(false);
+    setStepIndex(0);
+    setCode(value);
+  }, []);
+
   return (
     <main className="min-h-dvh w-full overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top,#162039_0%,#0d111c_42%,#090c13_100%)] px-3 py-3 text-zinc-100 sm:px-6 sm:py-4">
       <div className="mx-auto flex min-h-[calc(100dvh-1.5rem)] max-w-[1600px] flex-col rounded-2xl border border-cyan-400/20 bg-[#0a0e17]/95 shadow-[0_20px_80px_rgba(2,8,23,0.6)] sm:min-h-[calc(100dvh-2rem)]">
@@ -411,13 +438,7 @@ export function SimulatorWorkbench() {
         <section className="grid grid-cols-1 gap-3 p-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[1.1fr_1fr]">
           <CodeEditorPanel
             code={code}
-            onChange={(value) => {
-              clearPlaybackTimer();
-              clearAutoRunDebounce();
-              setIsRunning(false);
-              setStepIndex(0);
-              setCode(value);
-            }}
+            onChange={handleCodeChange}
             onRunShortcut={onRun}
             activeLine={currentStep?.snapshot.activeLine ?? 1}
             language={language}
@@ -432,14 +453,7 @@ export function SimulatorWorkbench() {
             language={language}
             mode={mode}
             verification={verification}
-            performance={{
-              estimatedRunMs,
-              simulationBuildMs,
-              lastRunMs,
-              currentMemoryBytes,
-              peakMemoryBytes,
-              tips: performanceTips,
-            }}
+            performance={performanceData}
           />
         </section>
       </div>

@@ -33,6 +33,7 @@ export function CodeEditorPanel({ code, onChange, onRunShortcut, activeLine, lan
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const decorationsRef = useRef<string[]>([]);
+  const lastActiveLineRef = useRef<number>(-1);
   const [inlineEditorError, setInlineEditorError] = useState<string>("");
 
   const onMount: OnMount = (editorInstance, monaco) => {
@@ -93,6 +94,11 @@ export function CodeEditorPanel({ code, onChange, onRunShortcut, activeLine, lan
     if (!editorInstance || !monaco) {
       return;
     }
+
+    if (lastActiveLineRef.current === activeLine) {
+      return;
+    }
+    lastActiveLineRef.current = activeLine;
 
     decorationsRef.current = editorInstance.deltaDecorations(decorationsRef.current, [
       {
@@ -213,7 +219,7 @@ export function CodeEditorPanel({ code, onChange, onRunShortcut, activeLine, lan
     refreshInlineError();
     const disposable = monaco.editor.onDidChangeMarkers(() => refreshInlineError());
     return () => disposable.dispose();
-  }, [code, language, parseError]);
+  }, [language, parseError]);
 
   return (
     <section className="flex min-h-[46dvh] min-w-0 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#0b1220] sm:min-h-[52dvh] lg:min-h-0">
