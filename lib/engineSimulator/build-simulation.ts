@@ -110,10 +110,39 @@ function interpolate(value: string, scope: Scope): string {
 }
 
 function evaluateExpression(value: string, scope: Scope): string {
+  const rawExpression = value.trim();
   const expression = interpolate(value, scope).trim();
 
   if (!expression) {
     return "undefined";
+  }
+
+  if (rawExpression.includes("+")) {
+    const parts = rawExpression.split("+").map((part) => part.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      const resolvedParts = parts.map((part) => {
+        if (Object.hasOwn(scope.values, part)) {
+          return scope.values[part];
+        }
+
+        if ((part.startsWith("\"") && part.endsWith("\"")) || (part.startsWith("'") && part.endsWith("'"))) {
+          return part.slice(1, -1);
+        }
+
+        if (/^-?\d+(\.\d+)?$/.test(part)) {
+          return part;
+        }
+
+        return part;
+      });
+
+      const allNumeric = resolvedParts.every((part) => /^-?\d+(\.\d+)?$/.test(part));
+      if (allNumeric) {
+        return String(resolvedParts.reduce((sum, part) => sum + Number(part), 0));
+      }
+
+      return resolvedParts.join("");
+    }
   }
 
   if (
