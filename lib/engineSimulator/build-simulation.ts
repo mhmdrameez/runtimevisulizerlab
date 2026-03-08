@@ -168,6 +168,194 @@ function evaluateExpression(value: string, scope: Scope): string {
   return expression;
 }
 
+function splitTopLevel(input: string, separator: string): string[] {
+  const chunks: string[] = [];
+  let current = "";
+  let depthParen = 0;
+  let depthBracket = 0;
+  let depthBrace = 0;
+  let quote: "'" | "\"" | null = null;
+  let escaped = false;
+
+  for (const char of input) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      current += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      current += char;
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === "\"") {
+      quote = char;
+      current += char;
+      continue;
+    }
+
+    if (char === "(") depthParen += 1;
+    if (char === ")") depthParen = Math.max(0, depthParen - 1);
+    if (char === "[") depthBracket += 1;
+    if (char === "]") depthBracket = Math.max(0, depthBracket - 1);
+    if (char === "{") depthBrace += 1;
+    if (char === "}") depthBrace = Math.max(0, depthBrace - 1);
+
+    if (char === separator && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
+      if (current.trim()) {
+        chunks.push(current.trim());
+      }
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim()) {
+    chunks.push(current.trim());
+  }
+
+  return chunks;
+}
+
+function findTopLevelColon(input: string): number {
+  let depthParen = 0;
+  let depthBracket = 0;
+  let depthBrace = 0;
+  let quote: "'" | "\"" | null = null;
+  let escaped = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+
+    if (char === "(") depthParen += 1;
+    if (char === ")") depthParen = Math.max(0, depthParen - 1);
+    if (char === "[") depthBracket += 1;
+    if (char === "]") depthBracket = Math.max(0, depthBracket - 1);
+    if (char === "{") depthBrace += 1;
+    if (char === "}") depthBrace = Math.max(0, depthBrace - 1);
+
+    if (char === ":" && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function normalizeObjectKey(raw: string): string {
+  const key = raw.trim();
+  if ((key.startsWith("\"") && key.endsWith("\"")) || (key.startsWith("'") && key.endsWith("'"))) {
+    return key.slice(1, -1);
+  }
+  return key;
+}
+
+function removeStructuredMemoryEntries(state: RuntimeState, name: string, scope: string): void {
+  state.memoryHeap = state.memoryHeap.filter(
+    (entry) => !(entry.scope === scope && (entry.key.startsWith(`${name}[`) || entry.key.startsWith(`${name}.`))),
+  );
+}
+
+function resolveStructuredValue(rawValue: string, scope: Scope): {
+  value: string;
+  entries: Array<{ key: string; value: string }>;
+} | null {
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    const inner = trimmed.slice(1, -1).trim();
+    const items = inner ? splitTopLevel(inner, ",") : [];
+    const values = items.map((item) => evaluateExpression(item, scope));
+    return {
+      value: `[${values.join(", ")}]`,
+      entries: values.map((item, index) => ({
+        key: `[${index}]`,
+        value: item,
+      })),
+    };
+  }
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    const inner = trimmed.slice(1, -1).trim();
+    const pairs = inner ? splitTopLevel(inner, ",") : [];
+    const entries: Array<{ key: string; value: string }> = [];
+
+    for (const pair of pairs) {
+      const colonIndex = findTopLevelColon(pair);
+      if (colonIndex < 0) {
+        continue;
+      }
+
+      const rawKey = pair.slice(0, colonIndex).trim();
+      const rawPropValue = pair.slice(colonIndex + 1).trim();
+      if (!rawKey) {
+        continue;
+      }
+
+      entries.push({
+        key: `.${normalizeObjectKey(rawKey)}`,
+        value: evaluateExpression(rawPropValue, scope),
+      });
+    }
+
+    const rendered = entries.map((entry) => `${entry.key.slice(1)}: ${entry.value}`).join(", ");
+    return {
+      value: `{${rendered}}`,
+      entries,
+    };
+  }
+
+  return null;
+}
+
+function syncStructuredMemoryEntries(
+  state: RuntimeState,
+  name: string,
+  scope: string,
+  entries: Array<{ key: string; value: string }>,
+): void {
+  removeStructuredMemoryEntries(state, name, scope);
+  for (const entry of entries) {
+    replaceMemoryEntry(state, `${name}${entry.key}`, entry.value, scope);
+  }
+}
+
 function getLineText(lines: string[], line: number): string {
   const text = lines[line - 1] ?? "";
   return text.trim() || "(empty line)";
@@ -208,12 +396,14 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
     for (const operation of operations) {
       switch (operation.type) {
         case "variable": {
-          const resolved = evaluateExpression(operation.value, activeScope);
+          const structured = resolveStructuredValue(operation.value, activeScope);
+          const resolved = structured?.value ?? evaluateExpression(operation.value, activeScope);
           activeScope.values[operation.name] = resolved;
           if (!state.contextVariables.includes(operation.name)) {
             state.contextVariables.push(operation.name);
           }
           replaceMemoryEntry(state, operation.name, resolved, activeScope.name);
+          syncStructuredMemoryEntries(state, operation.name, activeScope.name, structured?.entries ?? []);
           pushStep(
             "Variable Allocated",
             `${operation.kind} ${operation.name} is stored in memory with value ${resolved}.`,
