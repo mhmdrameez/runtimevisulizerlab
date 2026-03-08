@@ -11,6 +11,7 @@ import type {
 interface RuntimeState {
   callStack: StackFrame[];
   memoryHeap: MemoryEntry[];
+  memoryIndex: Map<string, number>;
   eventLoop: {
     microtasks: string[];
     macrotasks: string[];
@@ -18,6 +19,7 @@ interface RuntimeState {
   webApis: string[];
   stdout: string[];
   contextVariables: string[];
+  contextVariableSet: Set<string>;
   contextName: string;
   contextPhase: "creation" | "execution";
   activeLine: number;
@@ -36,11 +38,13 @@ interface Task {
 }
 
 const MAX_LOOP_ITERATIONS = 10;
+const DETAILED_HOIST_LIMIT = 24;
 
 function makeInitialState(): RuntimeState {
   return {
     callStack: [],
     memoryHeap: [],
+    memoryIndex: new Map<string, number>(),
     eventLoop: {
       microtasks: [],
       macrotasks: [],
@@ -48,6 +52,7 @@ function makeInitialState(): RuntimeState {
     webApis: [],
     stdout: [],
     contextVariables: [],
+    contextVariableSet: new Set<string>(),
     contextName: "Global",
     contextPhase: "creation",
     activeLine: 1,
@@ -79,11 +84,10 @@ function replaceMemoryEntry(
   value: string,
   scope: string,
 ): void {
-  const existingIndex = state.memoryHeap.findIndex(
-    (entry) => entry.key === name && entry.scope === scope,
-  );
+  const mapKey = `${scope}::${name}`;
+  const existingIndex = state.memoryIndex.get(mapKey);
 
-  if (existingIndex >= 0) {
+  if (existingIndex !== undefined) {
     state.memoryHeap[existingIndex] = {
       ...state.memoryHeap[existingIndex],
       value,
@@ -91,12 +95,35 @@ function replaceMemoryEntry(
     return;
   }
 
+  const nextIndex = state.memoryHeap.length;
   state.memoryHeap.push({
     id: `${scope}-${name}`,
     key: name,
     value,
     scope,
   });
+  state.memoryIndex.set(mapKey, nextIndex);
+}
+
+function rebuildMemoryIndex(state: RuntimeState): void {
+  state.memoryIndex.clear();
+  state.memoryHeap.forEach((entry, index) => {
+    state.memoryIndex.set(`${entry.scope}::${entry.key}`, index);
+  });
+}
+
+function trackContextVariable(state: RuntimeState, variableName: string): void {
+  if (state.contextVariableSet.has(variableName)) {
+    return;
+  }
+
+  state.contextVariableSet.add(variableName);
+  state.contextVariables.push(variableName);
+}
+
+function setContextVariables(state: RuntimeState, variableNames: string[]): void {
+  state.contextVariables = [...variableNames];
+  state.contextVariableSet = new Set(variableNames);
 }
 
 function interpolate(value: string, scope: Scope): string {
@@ -284,9 +311,13 @@ function normalizeObjectKey(raw: string): string {
 }
 
 function removeStructuredMemoryEntries(state: RuntimeState, name: string, scope: string): void {
+  const before = state.memoryHeap.length;
   state.memoryHeap = state.memoryHeap.filter(
     (entry) => !(entry.scope === scope && (entry.key.startsWith(`${name}[`) || entry.key.startsWith(`${name}.`))),
   );
+  if (state.memoryHeap.length !== before) {
+    rebuildMemoryIndex(state);
+  }
 }
 
 function resolveStructuredValue(rawValue: string, scope: Scope): {
@@ -399,9 +430,7 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
           const structured = resolveStructuredValue(operation.value, activeScope);
           const resolved = structured?.value ?? evaluateExpression(operation.value, activeScope);
           activeScope.values[operation.name] = resolved;
-          if (!state.contextVariables.includes(operation.name)) {
-            state.contextVariables.push(operation.name);
-          }
+          trackContextVariable(state, operation.name);
           replaceMemoryEntry(state, operation.name, resolved, activeScope.name);
           syncStructuredMemoryEntries(state, operation.name, activeScope.name, structured?.entries ?? []);
           pushStep(
@@ -441,7 +470,7 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
           });
           state.contextName = `${operation.name} Context`;
           state.contextPhase = "creation";
-          state.contextVariables = [...fn.params];
+          setContextVariables(state, fn.params);
           pushStep(
             "Call Stack Push",
             `${operation.name}() pushed to call stack; function execution context created.`,
@@ -472,7 +501,7 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
           state.callStack.pop();
           state.contextName = activeScope.name === "global" ? "Global" : `${activeScope.name} Context`;
           state.contextPhase = "execution";
-          state.contextVariables = Object.keys(activeScope.values);
+          setContextVariables(state, Object.keys(activeScope.values));
           pushStep(
             "Call Stack Pop",
             `${operation.name}() returned ${returnValue} and popped from call stack.`,
@@ -482,9 +511,7 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
           if (operation.assignTo) {
             activeScope.values[operation.assignTo] = returnValue;
             replaceMemoryEntry(state, operation.assignTo, returnValue, activeScope.name);
-            if (!state.contextVariables.includes(operation.assignTo)) {
-              state.contextVariables.push(operation.assignTo);
-            }
+            trackContextVariable(state, operation.assignTo);
             pushStep(
               "Return Value Assigned",
               `${operation.assignTo} receives return value ${returnValue}.`,
@@ -570,17 +597,28 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
     1,
   );
 
-  Object.values(program.functions).forEach((fn) => {
-    replaceMemoryEntry(state, fn.name, `function ${fn.name}(${fn.params.join(", ")})`, "global");
-    if (!state.contextVariables.includes(fn.name)) {
-      state.contextVariables.push(fn.name);
-    }
+  const functions = Object.values(program.functions);
+  if (functions.length > DETAILED_HOIST_LIMIT) {
+    functions.forEach((fn) => {
+      replaceMemoryEntry(state, fn.name, `function ${fn.name}(${fn.params.join(", ")})`, "global");
+      trackContextVariable(state, fn.name);
+    });
     pushStep(
-      "Function Hoisted",
-      `${fn.name} is stored in memory during creation phase.`,
-      fn.line,
+      "Function Hoisting Complete",
+      `${functions.length} functions were hoisted to memory during creation phase.`,
+      functions[0]?.line ?? 1,
     );
-  });
+  } else {
+    functions.forEach((fn) => {
+      replaceMemoryEntry(state, fn.name, `function ${fn.name}(${fn.params.join(", ")})`, "global");
+      trackContextVariable(state, fn.name);
+      pushStep(
+        "Function Hoisted",
+        `${fn.name} is stored in memory during creation phase.`,
+        fn.line,
+      );
+    });
+  }
 
   state.contextPhase = "execution";
   runOperations(program.operations, scope, program.functions);
@@ -614,14 +652,14 @@ export function buildSimulationSteps(program: ParsedProgram, source = ""): Simul
 
     state.contextName = `${task.label} Context`;
     state.contextPhase = "execution";
-    state.contextVariables = Object.keys(taskScope.values);
+    setContextVariables(state, Object.keys(taskScope.values));
 
     runOperations(task.body, taskScope, program.functions);
 
     state.callStack.pop();
     state.contextName = "Global";
     state.contextPhase = "execution";
-    state.contextVariables = Object.keys(scope.values);
+    setContextVariables(state, Object.keys(scope.values));
     pushStep("Callback Complete", `${task.label} completed and popped from call stack.`, task.line);
   };
 
