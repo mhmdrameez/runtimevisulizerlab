@@ -341,12 +341,12 @@ export function SimulatorWorkbench() {
   return (
     <main className="min-h-dvh w-full overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top,#162039_0%,#0d111c_42%,#090c13_100%)] px-3 py-3 text-zinc-100 sm:px-6 sm:py-4">
       <div className="mx-auto flex min-h-[calc(100dvh-1.5rem)] max-w-[1600px] flex-col rounded-2xl border border-cyan-400/20 bg-[#0a0e17]/95 shadow-[0_20px_80px_rgba(2,8,23,0.6)] sm:min-h-[calc(100dvh-2rem)]">
-        <header className="flex items-center justify-between border-b border-zinc-700/60 px-5 py-3">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-700/60 px-4 py-3 sm:px-5">
           <div>
             <h1 className="font-mono text-sm uppercase tracking-[0.22em] text-cyan-300">INSIDE JS</h1>
             <p className="text-xs text-zinc-400">A simple lab to understand JavaScript runtime.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
             <p className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100">JavaScript</p>
             <button
               type="button"

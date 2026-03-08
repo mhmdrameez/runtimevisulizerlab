@@ -70,7 +70,7 @@ export function ControlsBar({
   canClear,
 }: ControlsBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-zinc-700/70 px-4 py-3">
+    <div className="flex flex-wrap items-center gap-2 overflow-x-auto border-b border-zinc-700/70 px-3 py-3 sm:px-4">
       <ControlButton label="Run" onClick={onRun} variant="primary" disabled={running || totalSteps === 0} />
       <ControlButton label="Step Forward" onClick={onStepForward} disabled={!canStep} />
       <ControlButton label="Pause" onClick={onPause} variant="warn" disabled={!running} />
@@ -88,7 +88,7 @@ export function ControlsBar({
         variant={narrationEnabled ? "primary" : "neutral"}
       />
 
-      <label className="ml-2 flex items-center gap-2 text-xs text-zinc-300">
+      <label className="ml-0 flex items-center gap-2 text-xs text-zinc-300 sm:ml-2">
         <span>Speed</span>
         <input
           type="range"
@@ -102,10 +102,10 @@ export function ControlsBar({
         <span className="w-9 text-right font-mono">{speed.toFixed(1)}x</span>
       </label>
 
-      <p className="ml-auto rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
+      <p className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 sm:ml-auto">
         Step {Math.min(stepIndex + 1, Math.max(totalSteps, 1))} / {Math.max(totalSteps, 1)}
       </p>
-      <p className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-400">
+      <p className="hidden rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-400 sm:block">
         Run shortcut: Ctrl/Cmd + Enter
       </p>
     </div>

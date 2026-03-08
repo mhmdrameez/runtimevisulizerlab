@@ -255,7 +255,10 @@ export function VisualizationPanel({
 }: VisualizationPanelProps) {
   const [showCurrentStep, setShowCurrentStep] = useState(true);
   const [showRuntime, setShowRuntime] = useState(true);
-  const [showLanguageModel, setShowLanguageModel] = useState(true);
+  const [showLanguageModel, setShowLanguageModel] = useState(false);
+  const [showSimpleExplanation, setShowSimpleExplanation] = useState(true);
+  const [showEngineStepDetails, setShowEngineStepDetails] = useState(false);
+  const [showRuntimeVerification, setShowRuntimeVerification] = useState(false);
 
   if (!step) {
     return <section className="rounded-xl border border-zinc-700 bg-[#101827] p-5 text-sm text-zinc-300">No simulation steps available.</section>;
@@ -386,7 +389,12 @@ export function VisualizationPanel({
         </div>
       </SectionCard>
 
-      <SectionCard title="Simple Explanation">
+      <SectionCard
+        title="Simple Explanation"
+        collapsible
+        open={showSimpleExplanation}
+        onToggle={() => setShowSimpleExplanation((current) => !current)}
+      >
         <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-200">
           {explanationLines.map((line, idx) => (
             <li key={`${line}-${idx}`}>{line}</li>
@@ -404,7 +412,12 @@ export function VisualizationPanel({
       </SectionCard>
 
       {language === "javascript" ? (
-        <SectionCard title="Runtime Verification">
+        <SectionCard
+          title="Runtime Verification"
+          collapsible
+          open={showRuntimeVerification}
+          onToggle={() => setShowRuntimeVerification((current) => !current)}
+        >
           {verification.status === "verifying" ? (
             <p className="text-sm text-zinc-300">Checking output against real JavaScript runtime...</p>
           ) : verification.status === "ok" ? (
@@ -429,7 +442,12 @@ export function VisualizationPanel({
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Inside JS Engine (Step Details)">
+      <SectionCard
+        title="Inside JS Engine (Step Details)"
+        collapsible
+        open={showEngineStepDetails}
+        onToggle={() => setShowEngineStepDetails((current) => !current)}
+      >
         <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-200">
           {detailedEngineSteps.map((line, idx) => (
             <li key={`${line}-${idx}`}>{line}</li>
