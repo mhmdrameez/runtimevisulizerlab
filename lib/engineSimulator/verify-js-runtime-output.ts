@@ -164,6 +164,13 @@ export async function verifyJavaScriptRuntimeOutput(
     const sim = simulated[index];
     const simulatedOutput = sim?.output ?? "(no simulated output)";
     const actualOutput = actual[index] ?? "(no runtime output)";
+
+    // Runtime produced output for behavior not yet modeled by simulator.
+    // Don't surface this as an editor mismatch warning.
+    if (!sim && actual[index] !== undefined) {
+      continue;
+    }
+
     if (simulatedOutput === actualOutput) {
       continue;
     }
