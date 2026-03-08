@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeEditorPanel } from "@/components/CodeEditor/code-editor-panel";
 import { ControlsBar } from "@/components/Controls/controls-bar";
 import { VisualizationPanel } from "@/components/Visualization/visualization-panel";
-import { simulateRuntime } from "@/lib/engineSimulator/simulate-runtime";
+import { simulateRuntime, type RuntimeSimulationResult } from "@/lib/engineSimulator/simulate-runtime";
 import { verifyJavaScriptRuntimeOutput } from "@/lib/engineSimulator/verify-js-runtime-output";
 import { buildPerformanceTips } from "@/lib/engineSimulator/perf-insights";
 import type { RuntimeVerificationState, VisualizationMode } from "@/types/simulator";
@@ -69,11 +69,10 @@ export function SimulatorWorkbench() {
   const autoRunDebounceRef = useRef<number | null>(null);
   const lastAutoRunCodeRef = useRef<string>("");
   const verifyRequestIdRef = useRef(0);
-
-  const { steps, error } = useMemo(() => {
-    return simulateRuntime(language, code);
-  }, [code]);
-  const simulationBuildMs = Math.max(0.2, steps.length * 0.15 + code.length * 0.002);
+  const simulationRequestIdRef = useRef(0);
+  const [steps, setSteps] = useState<RuntimeSimulationResult["steps"]>(() => simulateRuntime(language, code).steps);
+  const [error, setError] = useState<string | undefined>(() => simulateRuntime(language, code).error);
+  const [simulationBuildMs, setSimulationBuildMs] = useState(() => Math.max(0.2, steps.length * 0.15 + code.length * 0.002));
   const performanceTips = useMemo(() => buildPerformanceTips(code), [code]);
   const estimatedRunMs = Math.max(0, (steps.length - 1) * (PLAYBACK_MS / playbackSpeed));
 
@@ -153,6 +152,56 @@ export function SimulatorWorkbench() {
     utterance.onend = () => onDone?.();
     window.speechSynthesis.speak(utterance);
   }, [narrationEnabled, playbackSpeed, stopSpeech]);
+
+  useEffect(() => {
+    simulationRequestIdRef.current += 1;
+    const requestId = simulationRequestIdRef.current;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/simulate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            language,
+            code,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Server simulation request failed.");
+        }
+
+        const payload = await response.json() as {
+          steps: RuntimeSimulationResult["steps"];
+          error?: string;
+          buildMs?: number;
+        };
+
+        if (simulationRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setSteps(payload.steps ?? []);
+        setError(payload.error);
+        setSimulationBuildMs(Math.max(0.1, Number(payload.buildMs ?? 0.1)));
+      } catch {
+        const start = performance.now();
+        const fallback = simulateRuntime(language, code);
+        const buildMs = performance.now() - start;
+        if (simulationRequestIdRef.current !== requestId) {
+          return;
+        }
+        setSteps(fallback.steps);
+        setError(fallback.error);
+        setSimulationBuildMs(Math.max(0.1, buildMs));
+      }
+    }, 90);
+
+    return () => window.clearTimeout(timer);
+  }, [language, code]);
 
   useEffect(() => {
     clearPlaybackTimer();
