@@ -200,8 +200,8 @@ export function SimulatorWorkbench({
     utterance.rate = Math.min(1.4, Math.max(0.75, playbackSpeed));
     utterance.pitch = 1;
     utterance.volume = 1;
-    utterance.onend = finish;
-    utterance.onerror = finish;
+    utterance.onend = () => finish();
+    utterance.onerror = () => finish();
     speechTimeoutRef.current = window.setTimeout(() => finish(true), SPEECH_TIMEOUT_MS);
     window.speechSynthesis.speak(utterance);
   }, [narrationEnabled, playbackSpeed]);
