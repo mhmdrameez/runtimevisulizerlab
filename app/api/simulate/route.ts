@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { simulateRuntime } from "@/lib/engineSimulator/simulate-runtime";
+import { buildNarrationNotes } from "@/lib/engineSimulator/narration-notes";
 import type { SupportedLanguage } from "@/types/simulator";
 
 interface CachedEntry {
   expiresAt: number;
   payload: {
     steps: ReturnType<typeof simulateRuntime>["steps"];
+    narrationNotes: string[];
     error?: string;
     buildMs: number;
   };
@@ -64,8 +66,10 @@ export async function POST(request: Request) {
     const start = performance.now();
     const result = simulateRuntime(language, code);
     const buildMs = performance.now() - start;
+    const narrationNotes = buildNarrationNotes(result.steps);
     const payload = {
       steps: result.steps,
+      narrationNotes,
       error: result.error,
       buildMs,
     };

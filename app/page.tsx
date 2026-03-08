@@ -1,11 +1,15 @@
 import { SimulatorWorkbench } from "@/components/simulator-workbench";
 import type { Metadata } from "next";
+import { DEFAULT_SIMULATION_CODE } from "@/lib/engineSimulator/default-code";
+import { simulateRuntime } from "@/lib/engineSimulator/simulate-runtime";
 
 export const metadata: Metadata = {
   title: "JavaScript Runtime Visualizer",
   description:
     "Learn how JavaScript executes code line by line with call stack, event loop, memory heap, and runtime-verified console output.",
 };
+
+export const dynamic = "force-dynamic";
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -31,13 +35,21 @@ const structuredData = {
 };
 
 export default function Home() {
+  const initial = simulateRuntime("javascript", DEFAULT_SIMULATION_CODE);
+  const initialBuildMs = Math.max(0.2, initial.steps.length * 0.15 + DEFAULT_SIMULATION_CODE.length * 0.002);
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <SimulatorWorkbench />
+      <SimulatorWorkbench
+        initialCode={DEFAULT_SIMULATION_CODE}
+        initialSteps={initial.steps}
+        initialError={initial.error}
+        initialBuildMs={initialBuildMs}
+      />
     </>
   );
 }

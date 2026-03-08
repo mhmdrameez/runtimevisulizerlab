@@ -4,32 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeEditorPanel } from "@/components/CodeEditor/code-editor-panel";
 import { ControlsBar } from "@/components/Controls/controls-bar";
 import { VisualizationPanel } from "@/components/Visualization/visualization-panel";
-import { simulateRuntime, type RuntimeSimulationResult } from "@/lib/engineSimulator/simulate-runtime";
 import { verifyJavaScriptRuntimeOutput } from "@/lib/engineSimulator/verify-js-runtime-output";
 import { buildPerformanceTips } from "@/lib/engineSimulator/perf-insights";
-import type { RuntimeVerificationState, VisualizationMode } from "@/types/simulator";
+import type { RuntimeVerificationState, SimulationStep, VisualizationMode } from "@/types/simulator";
+import { DEFAULT_SIMULATION_CODE } from "@/lib/engineSimulator/default-code";
 
 const GITHUB_URL = "https://github.com/mhmdrameez/runtimevisulizerlab";
 
-const DEFAULT_CODE = `function add(a, b) {
-  return a + b;
-}
-
-const result = add(2, 3);
-console.log(result);
-
-queueMicrotask(() => {
-  console.log("microtask fired");
-});
-
-setTimeout(() => {
-  console.log("macrotask fired");
-}, 0);`;
 const EMPTY_CODE = "";
 
 const PLAYBACK_MS = 900;
 const AUTO_RUN_DEBOUNCE_MS = 850;
 const VERIFY_DEBOUNCE_MS = 260;
+const SPEECH_TIMEOUT_MS = 7000;
+const MIN_SPEECH_MS = 420;
+const BASE_WPM = 170;
 
 function estimateHeapBytes(memory: Array<{ key: string; value: string; scope: string }>): number {
   return memory.reduce((total, item) => {
@@ -46,10 +35,36 @@ function GitHubIcon() {
   );
 }
 
-export function SimulatorWorkbench() {
+function estimateSpeechMs(text: string, playbackRate: number): number {
+  const words = Math.max(1, text.trim().split(/\s+/).length);
+  const wordsPerSecond = (BASE_WPM / 60) * Math.max(0.75, playbackRate);
+  const contentMs = (words / wordsPerSecond) * 1000;
+  return Math.max(MIN_SPEECH_MS, contentMs + 180);
+}
+
+function toSpeechSafeLine(text: string): string {
+  return (text.trim() || "empty line")
+    .replace(/[{}()[\];]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+interface SimulatorWorkbenchProps {
+  initialCode?: string;
+  initialSteps?: SimulationStep[];
+  initialError?: string;
+  initialBuildMs?: number;
+}
+
+export function SimulatorWorkbench({
+  initialCode = DEFAULT_SIMULATION_CODE,
+  initialSteps = [],
+  initialError,
+  initialBuildMs = 0.2,
+}: SimulatorWorkbenchProps) {
   const language = "javascript" as const;
   const [mode, setMode] = useState<VisualizationMode>("beginner");
-  const [code, setCode] = useState(DEFAULT_CODE);
+  const [code, setCode] = useState(initialCode);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [autoRunOnType, setAutoRunOnType] = useState(false);
   const [narrationEnabled, setNarrationEnabled] = useState(true);
@@ -70,9 +85,11 @@ export function SimulatorWorkbench() {
   const lastAutoRunCodeRef = useRef<string>("");
   const verifyRequestIdRef = useRef(0);
   const simulationRequestIdRef = useRef(0);
-  const [steps, setSteps] = useState<RuntimeSimulationResult["steps"]>(() => simulateRuntime(language, code).steps);
-  const [error, setError] = useState<string | undefined>(() => simulateRuntime(language, code).error);
-  const [simulationBuildMs, setSimulationBuildMs] = useState(() => Math.max(0.2, steps.length * 0.15 + code.length * 0.002));
+  const speechTokenRef = useRef(0);
+  const speechTimeoutRef = useRef<number | null>(null);
+  const [steps, setSteps] = useState<SimulationStep[]>(initialSteps);
+  const [error, setError] = useState<string | undefined>(initialError);
+  const [simulationBuildMs, setSimulationBuildMs] = useState(() => Math.max(0.2, initialBuildMs));
   const performanceTips = useMemo(() => buildPerformanceTips(code), [code]);
   const estimatedRunMs = Math.max(0, (steps.length - 1) * (PLAYBACK_MS / playbackSpeed));
 
@@ -110,6 +127,13 @@ export function SimulatorWorkbench() {
     }
   };
 
+  const clearSpeechTimeout = () => {
+    if (speechTimeoutRef.current !== null) {
+      window.clearTimeout(speechTimeoutRef.current);
+      speechTimeoutRef.current = null;
+    }
+  };
+
   const isLineCompleteForAutoRun = (source: string): boolean => {
     const trimmedEnd = source.trimEnd();
     if (!trimmedEnd) {
@@ -125,6 +149,8 @@ export function SimulatorWorkbench() {
   };
 
   const stopSpeech = useCallback(() => {
+    speechTokenRef.current += 1;
+    clearSpeechTimeout();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -144,14 +170,57 @@ export function SimulatorWorkbench() {
       return;
     }
 
-    stopSpeech();
+    speechTokenRef.current += 1;
+    const token = speechTokenRef.current;
+    clearSpeechTimeout();
+    window.speechSynthesis.cancel();
+
+    const startedAt = performance.now();
+    let resolved = false;
+    const finish = (force = false) => {
+      if (resolved || token !== speechTokenRef.current) {
+        return;
+      }
+
+      const elapsed = performance.now() - startedAt;
+      const estimatedMin = estimateSpeechMs(text, playbackSpeed);
+      if (!force && elapsed < estimatedMin) {
+        speechTimeoutRef.current = window.setTimeout(() => finish(true), Math.max(40, estimatedMin - elapsed));
+        return;
+      }
+
+      resolved = true;
+      clearSpeechTimeout();
+      onDone?.();
+    };
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = Math.min(1.4, Math.max(0.75, playbackSpeed));
     utterance.pitch = 1;
     utterance.volume = 1;
-    utterance.onend = () => onDone?.();
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    speechTimeoutRef.current = window.setTimeout(() => finish(true), SPEECH_TIMEOUT_MS);
     window.speechSynthesis.speak(utterance);
-  }, [narrationEnabled, playbackSpeed, stopSpeech]);
+  }, [narrationEnabled, playbackSpeed]);
+
+  const speakChunks = useCallback((chunks: string[], onDone?: () => void) => {
+    const queue = chunks.map((chunk) => chunk.trim()).filter(Boolean);
+    if (!queue.length) {
+      onDone?.();
+      return;
+    }
+
+    const runChunk = (index: number) => {
+      if (index >= queue.length) {
+        onDone?.();
+        return;
+      }
+      speakText(queue[index], () => runChunk(index + 1));
+    };
+
+    runChunk(0);
+  }, [speakText]);
 
   useEffect(() => {
     simulationRequestIdRef.current += 1;
@@ -175,7 +244,8 @@ export function SimulatorWorkbench() {
         }
 
         const payload = await response.json() as {
-          steps: RuntimeSimulationResult["steps"];
+          steps: SimulationStep[];
+          narrationNotes?: string[];
           error?: string;
           buildMs?: number;
         };
@@ -188,15 +258,10 @@ export function SimulatorWorkbench() {
         setError(payload.error);
         setSimulationBuildMs(Math.max(0.1, Number(payload.buildMs ?? 0.1)));
       } catch {
-        const start = performance.now();
-        const fallback = simulateRuntime(language, code);
-        const buildMs = performance.now() - start;
         if (simulationRequestIdRef.current !== requestId) {
           return;
         }
-        setSteps(fallback.steps);
-        setError(fallback.error);
-        setSimulationBuildMs(Math.max(0.1, buildMs));
+        setError("Server simulation unavailable. Please try again.");
       }
     }, 90);
 
@@ -227,7 +292,13 @@ export function SimulatorWorkbench() {
     return clearPlaybackTimer;
   }, [isRunning, stepIndex, steps.length, playbackSpeed, narrationEnabled, syncWithNarration, finishRunIfNeeded]);
 
-  useEffect(() => clearPlaybackTimer, []);
+  useEffect(() => {
+    return () => {
+      clearPlaybackTimer();
+      clearAutoRunDebounce();
+      stopSpeech();
+    };
+  }, [stopSpeech]);
 
   useEffect(() => {
     if (!isRunning || !narrationEnabled || !syncWithNarration || !currentStep) {
@@ -239,7 +310,15 @@ export function SimulatorWorkbench() {
     }
     lastNarratedStepIdRef.current = currentStep.id;
 
-    speakText(`Step ${stepIndex + 1}. ${currentStep.details}`, () => {
+    const chunks = [
+      `Step ${stepIndex + 1}.`,
+      `Line ${currentStep.line}.`,
+      `Code: ${toSpeechSafeLine(currentStep.lineExecuted)}.`,
+      currentStep.details,
+      stepIndex < steps.length - 1 ? "Next." : "",
+    ];
+
+    speakChunks(chunks, () => {
       setStepIndex((current) => {
         if (current >= steps.length - 1) {
           finishRunIfNeeded();
@@ -253,7 +332,7 @@ export function SimulatorWorkbench() {
         return next;
       });
     });
-  }, [isRunning, narrationEnabled, syncWithNarration, currentStep, stepIndex, steps.length, finishRunIfNeeded, speakText]);
+  }, [isRunning, narrationEnabled, syncWithNarration, currentStep, stepIndex, steps.length, finishRunIfNeeded, speakChunks]);
 
   useEffect(() => {
     if (!isRunning || !narrationEnabled || syncWithNarration || !currentStep) {
@@ -264,8 +343,15 @@ export function SimulatorWorkbench() {
       return;
     }
     lastNarratedStepIdRef.current = currentStep.id;
-    speakText(`Step ${stepIndex + 1}. ${currentStep.details}`);
-  }, [isRunning, narrationEnabled, syncWithNarration, currentStep, stepIndex, speakText]);
+    const chunks = [
+      `Step ${stepIndex + 1}.`,
+      `Line ${currentStep.line}.`,
+      `Code: ${toSpeechSafeLine(currentStep.lineExecuted)}.`,
+      currentStep.details,
+      stepIndex < steps.length - 1 ? "Next." : "",
+    ];
+    speakChunks(chunks);
+  }, [isRunning, narrationEnabled, syncWithNarration, currentStep, stepIndex, steps.length, speakChunks]);
 
   const onRun = useCallback(() => {
     if (steps.length === 0) {
