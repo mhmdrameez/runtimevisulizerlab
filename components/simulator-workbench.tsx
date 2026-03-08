@@ -19,6 +19,7 @@ const VERIFY_DEBOUNCE_MS = 260;
 const SPEECH_TIMEOUT_MS = 7000;
 const MIN_SPEECH_MS = 420;
 const BASE_WPM = 170;
+const SSR_LIVE_DEBOUNCE_MS = 35;
 
 function estimateHeapBytes(memory: Array<{ key: string; value: string; scope: string }>): number {
   return memory.reduce((total, item) => {
@@ -85,6 +86,7 @@ export function SimulatorWorkbench({
   const lastAutoRunCodeRef = useRef<string>("");
   const verifyRequestIdRef = useRef(0);
   const simulationRequestIdRef = useRef(0);
+  const simulationAbortRef = useRef<AbortController | null>(null);
   const speechTokenRef = useRef(0);
   const speechTimeoutRef = useRef<number | null>(null);
   const [steps, setSteps] = useState<SimulationStep[]>(initialSteps);
@@ -225,14 +227,19 @@ export function SimulatorWorkbench({
   useEffect(() => {
     simulationRequestIdRef.current += 1;
     const requestId = simulationRequestIdRef.current;
+    simulationAbortRef.current?.abort();
 
     const timer = window.setTimeout(async () => {
+      const controller = new AbortController();
+      simulationAbortRef.current = controller;
+
       try {
         const response = await fetch("/api/simulate", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          signal: controller.signal,
           body: JSON.stringify({
             language,
             code,
@@ -257,15 +264,23 @@ export function SimulatorWorkbench({
         setSteps(payload.steps ?? []);
         setError(payload.error);
         setSimulationBuildMs(Math.max(0.1, Number(payload.buildMs ?? 0.1)));
-      } catch {
+      } catch (fetchError) {
+        const isAbort = fetchError instanceof DOMException && fetchError.name === "AbortError";
+        if (isAbort) {
+          return;
+        }
         if (simulationRequestIdRef.current !== requestId) {
           return;
         }
-        setError("Server simulation unavailable. Please try again.");
+        // Keep previous steps rendered and avoid breaking typing experience.
+        setError(undefined);
       }
-    }, 90);
+    }, SSR_LIVE_DEBOUNCE_MS);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      simulationAbortRef.current?.abort();
+    };
   }, [language, code]);
 
   useEffect(() => {
@@ -579,6 +594,8 @@ export function SimulatorWorkbench({
             language={language}
             parseError={error}
             verificationIssues={verification.issues}
+            verificationStatus={verification.status}
+            verificationError={verification.error}
           />
           <VisualizationPanel
             step={currentStep}

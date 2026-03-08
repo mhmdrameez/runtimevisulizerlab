@@ -4,7 +4,7 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useEffect, useRef, useState } from "react";
 
-import type { RuntimeVerificationIssue, SupportedLanguage } from "@/types/simulator";
+import type { RuntimeVerificationIssue, RuntimeVerificationState, SupportedLanguage } from "@/types/simulator";
 
 interface CodeEditorPanelProps {
   code: string;
@@ -14,6 +14,8 @@ interface CodeEditorPanelProps {
   language: SupportedLanguage;
   parseError?: string;
   verificationIssues?: RuntimeVerificationIssue[];
+  verificationStatus?: RuntimeVerificationState["status"];
+  verificationError?: string;
 }
 
 function getEditorLabel(language: SupportedLanguage): string {
@@ -29,7 +31,17 @@ function getEditorLabel(language: SupportedLanguage): string {
   return `editor.${extMap[language]}`;
 }
 
-export function CodeEditorPanel({ code, onChange, onRunShortcut, activeLine, language, parseError, verificationIssues = [] }: CodeEditorPanelProps) {
+export function CodeEditorPanel({
+  code,
+  onChange,
+  onRunShortcut,
+  activeLine,
+  language,
+  parseError,
+  verificationIssues = [],
+  verificationStatus = "idle",
+  verificationError,
+}: CodeEditorPanelProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -256,6 +268,18 @@ export function CodeEditorPanel({ code, onChange, onRunShortcut, activeLine, lan
 
       {parseError ? (
         <p className="border-t border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">Live error: {parseError}</p>
+      ) : verificationStatus === "verifying" ? (
+        <p className="border-t border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">Verifying runtime output...</p>
+      ) : verificationStatus === "ok" ? (
+        <p className="border-t border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">Runtime output verified.</p>
+      ) : verificationStatus === "mismatch" ? (
+        <p className="border-t border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          Output mismatch found on {verificationIssues.length} line{verificationIssues.length === 1 ? "" : "s"}.
+        </p>
+      ) : verificationStatus === "error" ? (
+        <p className="border-t border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          Verification error: {verificationError ?? "unknown"}
+        </p>
       ) : (
         <p className="border-t border-zinc-700 px-3 py-2 text-xs text-zinc-400">
           Real-time syntax and output verification run in the background.
