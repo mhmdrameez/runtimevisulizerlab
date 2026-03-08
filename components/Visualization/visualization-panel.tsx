@@ -259,6 +259,7 @@ export function VisualizationPanel({
   const [showSimpleExplanation, setShowSimpleExplanation] = useState(true);
   const [showEngineStepDetails, setShowEngineStepDetails] = useState(false);
   const [showRuntimeVerification, setShowRuntimeVerification] = useState(false);
+  const [showPerformanceSuggestions, setShowPerformanceSuggestions] = useState(false);
 
   if (!step) {
     return <section className="rounded-xl border border-zinc-700 bg-[#101827] p-5 text-sm text-zinc-300">No simulation steps available.</section>;
@@ -374,22 +375,6 @@ export function VisualizationPanel({
       </SectionCard>
 
       <SectionCard
-        title="How This Language Runs"
-        collapsible
-        open={showLanguageModel}
-        onToggle={() => setShowLanguageModel((current) => !current)}
-      >
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          {engineModel.map((item) => (
-            <article key={item.title} className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
-              <h4 className="mb-1 text-sm font-semibold text-zinc-100">{item.title}</h4>
-              <p className="font-mono text-xs text-zinc-200">{item.value}</p>
-            </article>
-          ))}
-        </div>
-      </SectionCard>
-
-      <SectionCard
         title="Simple Explanation"
         collapsible
         open={showSimpleExplanation}
@@ -408,6 +393,22 @@ export function VisualizationPanel({
           <div className="max-h-36 overflow-auto font-mono text-xs text-zinc-100">
             {consoleOutputLines.length ? consoleOutputLines.map((line, i) => <p key={`${line}-${i}`}>{line}</p>) : <p className="text-zinc-400">No output yet.</p>}
           </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="How This Language Runs"
+        collapsible
+        open={showLanguageModel}
+        onToggle={() => setShowLanguageModel((current) => !current)}
+      >
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          {engineModel.map((item) => (
+            <article key={item.title} className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
+              <h4 className="mb-1 text-sm font-semibold text-zinc-100">{item.title}</h4>
+              <p className="font-mono text-xs text-zinc-200">{item.value}</p>
+            </article>
+          ))}
         </div>
       </SectionCard>
 
@@ -455,7 +456,12 @@ export function VisualizationPanel({
         </ol>
       </SectionCard>
 
-      <SectionCard title="Performance & Suggestions">
+      <SectionCard
+        title="Performance & Suggestions"
+        collapsible
+        open={showPerformanceSuggestions}
+        onToggle={() => setShowPerformanceSuggestions((current) => !current)}
+      >
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           <article className="rounded-lg border border-zinc-600 bg-[#0b1220] p-3">
             <h4 className="mb-1 text-sm font-semibold text-zinc-100">Estimated Run Time</h4>
