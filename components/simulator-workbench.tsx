@@ -30,7 +30,6 @@ const EMPTY_CODE = "";
 const PLAYBACK_MS = 900;
 const AUTO_RUN_DEBOUNCE_MS = 850;
 const VERIFY_DEBOUNCE_MS = 260;
-const SPEECH_STEP_TIMEOUT_MS = 6000;
 
 function estimateHeapBytes(memory: Array<{ key: string; value: string; scope: string }>): number {
   return memory.reduce((total, item) => {
@@ -70,8 +69,6 @@ export function SimulatorWorkbench() {
   const autoRunDebounceRef = useRef<number | null>(null);
   const lastAutoRunCodeRef = useRef<string>("");
   const verifyRequestIdRef = useRef(0);
-  const speechRunTokenRef = useRef(0);
-  const speechTimeoutRef = useRef<number | null>(null);
 
   const { steps, error } = useMemo(() => {
     return simulateRuntime(language, code);
@@ -114,13 +111,6 @@ export function SimulatorWorkbench() {
     }
   };
 
-  const clearSpeechTimeout = () => {
-    if (speechTimeoutRef.current !== null) {
-      window.clearTimeout(speechTimeoutRef.current);
-      speechTimeoutRef.current = null;
-    }
-  };
-
   const isLineCompleteForAutoRun = (source: string): boolean => {
     const trimmedEnd = source.trimEnd();
     if (!trimmedEnd) {
@@ -136,8 +126,6 @@ export function SimulatorWorkbench() {
   };
 
   const stopSpeech = useCallback(() => {
-    speechRunTokenRef.current += 1;
-    clearSpeechTimeout();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -157,31 +145,14 @@ export function SimulatorWorkbench() {
       return;
     }
 
-    speechRunTokenRef.current += 1;
-    const token = speechRunTokenRef.current;
-    clearSpeechTimeout();
-    window.speechSynthesis.cancel();
-
-    let finished = false;
-    const finalize = () => {
-      if (finished || token !== speechRunTokenRef.current) {
-        return;
-      }
-      finished = true;
-      clearSpeechTimeout();
-      onDone?.();
-    };
-
+    stopSpeech();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = Math.min(1.4, Math.max(0.75, playbackSpeed));
     utterance.pitch = 1;
     utterance.volume = 1;
-    utterance.onend = finalize;
-    utterance.onerror = finalize;
-
-    speechTimeoutRef.current = window.setTimeout(finalize, SPEECH_STEP_TIMEOUT_MS);
+    utterance.onend = () => onDone?.();
     window.speechSynthesis.speak(utterance);
-  }, [narrationEnabled, playbackSpeed]);
+  }, [narrationEnabled, playbackSpeed, stopSpeech]);
 
   useEffect(() => {
     clearPlaybackTimer();
@@ -207,11 +178,7 @@ export function SimulatorWorkbench() {
     return clearPlaybackTimer;
   }, [isRunning, stepIndex, steps.length, playbackSpeed, narrationEnabled, syncWithNarration, finishRunIfNeeded]);
 
-  useEffect(() => () => {
-    clearPlaybackTimer();
-    clearAutoRunDebounce();
-    stopSpeech();
-  }, [stopSpeech]);
+  useEffect(() => clearPlaybackTimer, []);
 
   useEffect(() => {
     if (!isRunning || !narrationEnabled || !syncWithNarration || !currentStep) {
@@ -223,8 +190,7 @@ export function SimulatorWorkbench() {
     }
     lastNarratedStepIdRef.current = currentStep.id;
 
-    const stepNarration = `Line ${currentStep.line}. ${currentStep.lineExecuted.trim() || "empty line"}.`;
-    speakText(stepNarration, () => {
+    speakText(`Step ${stepIndex + 1}. ${currentStep.details}`, () => {
       setStepIndex((current) => {
         if (current >= steps.length - 1) {
           finishRunIfNeeded();
