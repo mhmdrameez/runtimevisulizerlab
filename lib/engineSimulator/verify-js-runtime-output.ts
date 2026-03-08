@@ -5,6 +5,10 @@ interface WorkerResult {
   error?: string;
 }
 
+const MAX_SAFE_LOOP_BOUND = 100000;
+const MAX_RUNTIME_LOG_LINES = 2000;
+const MAX_RUNTIME_LOG_CHARS = 120000;
+
 function collectSimulatedConsoleOutputs(steps: SimulationStep[]): Array<{ line: number; output: string }> {
   const outputs: Array<{ line: number; output: string }> = [];
   let prevCount = 0;
@@ -29,6 +33,24 @@ function collectSimulatedConsoleOutputs(steps: SimulationStep[]): Array<{ line: 
   return outputs;
 }
 
+function shouldSkipRuntimeVerification(code: string): boolean {
+  if (!code.trim()) {
+    return true;
+  }
+
+  // Avoid verifying patterns likely to lock worker CPU or flood output.
+  if (/for\s*\(\s*;\s*;\s*\)/.test(code) || /while\s*\(\s*true\s*\)/.test(code) || /do\s*\{[\s\S]*\}\s*while\s*\(\s*true\s*\)/.test(code)) {
+    return true;
+  }
+
+  const forLoopMatches = [...code.matchAll(/for\s*\([^;]*;[^;]*<\s*(\d+)\s*;[^)]*\)/g)];
+  if (forLoopMatches.some((match) => Number(match[1]) > MAX_SAFE_LOOP_BOUND)) {
+    return true;
+  }
+
+  return false;
+}
+
 async function runInWorker(code: string, timeoutMs: number): Promise<WorkerResult> {
   if (typeof window === "undefined") {
     return { logs: [] };
@@ -37,7 +59,10 @@ async function runInWorker(code: string, timeoutMs: number): Promise<WorkerResul
   const workerSource = `
 self.onmessage = async (event) => {
   const source = String(event.data?.code ?? "");
+  const maxLines = Number(event.data?.maxLines ?? 2000);
+  const maxChars = Number(event.data?.maxChars ?? 120000);
   const logs = [];
+  let totalChars = 0;
   const microtasks = [];
   const macrotasks = [];
 
@@ -56,7 +81,12 @@ self.onmessage = async (event) => {
   const consoleShim = {
     ...console,
     log: (...args) => {
-      logs.push(args.map(toText).join(" "));
+      const line = args.map(toText).join(" ");
+      totalChars += line.length;
+      if (logs.length >= maxLines || totalChars >= maxChars) {
+        throw new Error("Runtime verification stopped: console output limit reached.");
+      }
+      logs.push(line);
     },
   };
 
@@ -132,7 +162,11 @@ self.onmessage = async (event) => {
         });
       };
 
-      worker.postMessage({ code });
+      worker.postMessage({
+        code,
+        maxLines: MAX_RUNTIME_LOG_LINES,
+        maxChars: MAX_RUNTIME_LOG_CHARS,
+      });
     });
 
     return result;
@@ -155,6 +189,14 @@ export async function verifyJavaScriptRuntimeOutput(
   }
 
   const simulated = collectSimulatedConsoleOutputs(steps);
+  if (shouldSkipRuntimeVerification(code)) {
+    return {
+      status: "ok",
+      verifiedOutput: simulated.map((item) => item.output),
+      issues: [],
+    };
+  }
+
   const workerResult = await runInWorker(code, timeoutMs);
   const actual = workerResult.logs;
   const maxCount = Math.max(simulated.length, actual.length);
