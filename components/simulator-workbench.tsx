@@ -53,7 +53,7 @@ export function SimulatorWorkbench() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [autoRunOnType, setAutoRunOnType] = useState(false);
   const [narrationEnabled, setNarrationEnabled] = useState(true);
-  const syncWithNarration = false;
+  const syncWithNarration = true;
   const [isRunning, setIsRunning] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [lastRunMs, setLastRunMs] = useState<number | null>(null);
