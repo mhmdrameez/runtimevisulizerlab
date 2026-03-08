@@ -67,68 +67,6 @@ function isMemoryChanged(prev: MemoryEntry[] | undefined, current: MemoryEntry):
   return found.value !== current.value;
 }
 
-function getSimpleExplanation(step: SimulationStep): string[] {
-  const text = `${step.title} ${step.details}`.toLowerCase();
-
-  if (text.includes("global execution context")) {
-    return [
-      "JavaScript starts the program.",
-      "The main program is put on the call stack.",
-      "Now it can run each line one by one.",
-    ];
-  }
-
-  if (text.includes("function hoisted")) {
-    return [
-      "JavaScript saves this function in memory.",
-      "You can use this function later.",
-    ];
-  }
-
-  if (text.includes("call stack push") || text.includes("function call")) {
-    return [
-      "A function is called.",
-      "It is added to the call stack.",
-      "JavaScript runs that function now.",
-    ];
-  }
-
-  if (text.includes("call stack pop") || text.includes("function return")) {
-    return [
-      "The function finishes.",
-      "It returns a value.",
-      "It is removed from the call stack.",
-    ];
-  }
-
-  if (text.includes("variable") || text.includes("assigned")) {
-    return [
-      "A variable is created or updated.",
-      "Its value is saved in memory.",
-    ];
-  }
-
-  if (text.includes("task queued") || text.includes("microtask") || text.includes("macrotask")) {
-    return [
-      "An async task is waiting in a queue.",
-      "Microtasks run first.",
-      "Then callback queue tasks run when stack is empty.",
-    ];
-  }
-
-  if (text.includes("console.log")) {
-    return [
-      "console.log() runs.",
-      "The value is shown in Console Output.",
-    ];
-  }
-
-  return [
-    "JavaScript runs this line.",
-    "The runtime state is updated.",
-  ];
-}
-
 function getEngineDetail(
   current: SimulationStep,
   previous?: SimulationStep,
@@ -272,7 +210,6 @@ export function VisualizationPanel({
   const microtasks = step.snapshot.eventLoop.microtasks;
   const callbacks = step.snapshot.eventLoop.macrotasks;
   const webApis = step.snapshot.webApis;
-  const explanationLines = getSimpleExplanation(step);
   const labels = getRuntimeLabels(language);
   const engineModel = getEngineModel(language, step.snapshot);
   const detailedEngineSteps = getEngineDetail(step, prevStep, nextStep);
@@ -283,18 +220,6 @@ export function VisualizationPanel({
 
   return (
     <section className="flex min-h-[44dvh] flex-col gap-3 overflow-auto pr-1 lg:min-h-0">
-      <SectionCard
-        title="What Line Is Running"
-        collapsible
-        open={showCurrentStep}
-        onToggle={() => setShowCurrentStep((current) => !current)}
-      >
-        <p className="text-sm text-zinc-400">Running Step {stepIndex + 1} of {totalSteps}</p>
-        <p className="mt-2 text-sm text-zinc-300">Running Line {step.line}</p>
-        <p className="mt-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-mono text-sm text-cyan-100">{step.lineExecuted}</p>
-        <p className="mt-3 text-sm text-zinc-200"><span className="font-semibold text-zinc-100">Explanation:</span> {step.details}</p>
-      </SectionCard>
-
       <SectionCard
         title="Inside JavaScript Right Now"
         collapsible
@@ -375,25 +300,35 @@ export function VisualizationPanel({
       </SectionCard>
 
       <SectionCard
-        title="Simple Explanation"
+        title="Console"
         collapsible
         open={showSimpleExplanation}
         onToggle={() => setShowSimpleExplanation((current) => !current)}
       >
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-200">
-          {explanationLines.map((line, idx) => (
-            <li key={`${line}-${idx}`}>{line}</li>
-          ))}
-        </ol>
-
-        <div className="mt-3 rounded-lg border border-sky-400/40 bg-[#0f2236] p-3">
-          <h4 className="mb-2 text-sm font-semibold text-sky-100">
+        <div className="rounded-lg border border-zinc-700 bg-black p-3">
+          <h4 className="mb-2 text-sm font-semibold text-zinc-100">
             {language === "javascript" ? "Verified Console Output" : "Console Output"}
           </h4>
-          <div className="max-h-36 overflow-auto font-mono text-xs text-zinc-100">
-            {consoleOutputLines.length ? consoleOutputLines.map((line, i) => <p key={`${line}-${i}`}>{line}</p>) : <p className="text-zinc-400">No output yet.</p>}
+          <div className="max-h-48 min-h-28 overflow-auto rounded border border-zinc-800 bg-black p-2 font-mono text-xs text-emerald-300">
+            {consoleOutputLines.length ? (
+              consoleOutputLines.map((line, i) => <p key={`${line}-${i}`}>&gt; {line}</p>)
+            ) : (
+              <p className="text-zinc-500">&gt; No output yet.</p>
+            )}
           </div>
         </div>
+      </SectionCard>
+
+      <SectionCard
+        title="What Line Is Running"
+        collapsible
+        open={showCurrentStep}
+        onToggle={() => setShowCurrentStep((current) => !current)}
+      >
+        <p className="text-sm text-zinc-400">Running Step {stepIndex + 1} of {totalSteps}</p>
+        <p className="mt-2 text-sm text-zinc-300">Running Line {step.line}</p>
+        <p className="mt-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-mono text-sm text-cyan-100">{step.lineExecuted}</p>
+        <p className="mt-3 text-sm text-zinc-200"><span className="font-semibold text-zinc-100">Explanation:</span> {step.details}</p>
       </SectionCard>
 
       <SectionCard
