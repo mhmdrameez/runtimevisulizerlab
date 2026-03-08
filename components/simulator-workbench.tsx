@@ -9,6 +9,8 @@ import { verifyJavaScriptRuntimeOutput } from "@/lib/engineSimulator/verify-js-r
 import { buildPerformanceTips } from "@/lib/engineSimulator/perf-insights";
 import type { RuntimeVerificationState, VisualizationMode } from "@/types/simulator";
 
+const GITHUB_URL = "https://github.com/mhmdrameez/runtimevisulizerlab";
+
 const DEFAULT_CODE = `function add(a, b) {
   return a + b;
 }
@@ -34,6 +36,14 @@ function estimateHeapBytes(memory: Array<{ key: string; value: string; scope: st
     const chars = item.key.length + item.value.length + item.scope.length;
     return total + chars * 2 + 24;
   }, 0);
+}
+
+function GitHubIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
+      <path d="M12 .5a12 12 0 0 0-3.79 23.38c.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.38-1.33-1.75-1.33-1.75-1.1-.75.09-.74.09-.74 1.2.09 1.84 1.23 1.84 1.23 1.08 1.85 2.83 1.31 3.52 1 .11-.78.42-1.31.77-1.61-2.66-.3-5.47-1.33-5.47-5.9 0-1.3.46-2.35 1.22-3.18-.12-.3-.53-1.54.12-3.2 0 0 1-.32 3.28 1.22a11.42 11.42 0 0 1 5.97 0c2.27-1.54 3.27-1.22 3.27-1.22.65 1.66.24 2.9.12 3.2.76.83 1.22 1.88 1.22 3.18 0 4.58-2.81 5.59-5.49 5.89.44.38.82 1.11.82 2.25v3.33c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z" />
+    </svg>
+  );
 }
 
 export function SimulatorWorkbench() {
@@ -348,6 +358,25 @@ export function SimulatorWorkbench() {
           </div>
           <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
             <p className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100">JavaScript</p>
+            <a
+              href={`${GITHUB_URL}/blob/main/CONTRIBUTING.md`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs text-emerald-100 hover:bg-emerald-500/25"
+            >
+              Contribute
+            </a>
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+              aria-label="Open GitHub repository"
+              title="Open GitHub repository"
+            >
+              <GitHubIcon />
+              <span>GitHub</span>
+            </a>
             <button
               type="button"
               onClick={() => setMode((current) => (current === "beginner" ? "advanced" : "beginner"))}

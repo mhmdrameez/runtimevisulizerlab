@@ -16,6 +16,8 @@ const structuredData = {
   description:
     "Interactive JavaScript runtime visualizer that explains call stack, event loop, queues, memory, and console output.",
   url: "https://inside-js.vercel.app/",
+  codeRepository: "https://github.com/mhmdrameez/runtimevisulizerlab",
+  sameAs: ["https://github.com/mhmdrameez/runtimevisulizerlab"],
   inLanguage: "en",
   offers: {
     "@type": "Offer",

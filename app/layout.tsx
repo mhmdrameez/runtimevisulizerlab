@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   description:
     "Interactive JavaScript runtime visualizer for call stack, event loop, microtasks, macrotasks, memory heap, and console output with step-by-step execution.",
   applicationName: "INSIDE JS",
+  creator: "Runtime Visualizer Lab",
+  publisher: "Runtime Visualizer Lab",
+  authors: [{ name: "Runtime Visualizer Lab", url: "https://github.com/mhmdrameez/runtimevisulizerlab" }],
   keywords: [
     "JavaScript visualizer",
     "JavaScript runtime visualizer",
