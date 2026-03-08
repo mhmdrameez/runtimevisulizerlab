@@ -4,7 +4,7 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useEffect, useRef, useState } from "react";
 
-import type { SupportedLanguage } from "@/types/simulator";
+import type { RuntimeVerificationIssue, SupportedLanguage } from "@/types/simulator";
 
 interface CodeEditorPanelProps {
   code: string;
@@ -12,6 +12,7 @@ interface CodeEditorPanelProps {
   activeLine: number;
   language: SupportedLanguage;
   parseError?: string;
+  verificationIssues?: RuntimeVerificationIssue[];
 }
 
 function getEditorLabel(language: SupportedLanguage): string {
@@ -27,7 +28,7 @@ function getEditorLabel(language: SupportedLanguage): string {
   return `editor.${extMap[language]}`;
 }
 
-export function CodeEditorPanel({ code, onChange, activeLine, language, parseError }: CodeEditorPanelProps) {
+export function CodeEditorPanel({ code, onChange, activeLine, language, parseError, verificationIssues = [] }: CodeEditorPanelProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -146,6 +147,42 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
       return;
     }
 
+    if (!verificationIssues.length) {
+      monaco.editor.setModelMarkers(model, "runtime-verify", []);
+      return;
+    }
+
+    monaco.editor.setModelMarkers(
+      model,
+      "runtime-verify",
+      verificationIssues.map((issue) => {
+        const safeLine = Math.min(Math.max(issue.line, 1), model.getLineCount());
+        const startColumn = 1;
+        const endColumn = model.getLineMaxColumn(safeLine);
+        return {
+          severity: monaco.MarkerSeverity.Warning,
+          message: `Output mismatch. ${issue.fix}`,
+          startLineNumber: safeLine,
+          startColumn,
+          endLineNumber: safeLine,
+          endColumn,
+        };
+      }),
+    );
+  }, [verificationIssues]);
+
+  useEffect(() => {
+    const editorInstance = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editorInstance || !monaco) {
+      return;
+    }
+
+    const model = editorInstance.getModel();
+    if (!model) {
+      return;
+    }
+
     const refreshInlineError = () => {
       const markers = monaco.editor
         .getModelMarkers({ resource: model.uri })
@@ -201,7 +238,7 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
         <p className="border-t border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">Live error: {parseError}</p>
       ) : (
         <p className="border-t border-zinc-700 px-3 py-2 text-xs text-zinc-400">
-          Real-time syntax and code errors show directly on the editor line.
+          Real-time syntax and output verification run in the background.
         </p>
       )}
 

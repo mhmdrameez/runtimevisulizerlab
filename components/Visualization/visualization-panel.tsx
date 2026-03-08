@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type {
   MemoryEntry,
+  RuntimeVerificationState,
   SimulationSnapshot,
   SimulationStep,
   SupportedLanguage,
@@ -16,6 +17,7 @@ interface VisualizationPanelProps {
   totalSteps: number;
   language: SupportedLanguage;
   mode: VisualizationMode;
+  verification: RuntimeVerificationState;
   performance: {
     estimatedRunMs: number;
     simulationBuildMs: number;
@@ -248,6 +250,7 @@ export function VisualizationPanel({
   totalSteps,
   language,
   mode,
+  verification,
   performance,
 }: VisualizationPanelProps) {
   const [showCurrentStep, setShowCurrentStep] = useState(true);
@@ -269,6 +272,10 @@ export function VisualizationPanel({
   const labels = getRuntimeLabels(language);
   const engineModel = getEngineModel(language, step.snapshot);
   const detailedEngineSteps = getEngineDetail(step, prevStep, nextStep);
+  const consoleOutputLines =
+    language === "javascript" && verification.verifiedOutput.length
+      ? verification.verifiedOutput
+      : step.snapshot.stdout;
 
   return (
     <section className="flex min-h-0 flex-col gap-3 overflow-auto pr-1">
@@ -387,12 +394,40 @@ export function VisualizationPanel({
         </ol>
 
         <div className="mt-3 rounded-lg border border-sky-400/40 bg-[#0f2236] p-3">
-          <h4 className="mb-2 text-sm font-semibold text-sky-100">Console Output</h4>
+          <h4 className="mb-2 text-sm font-semibold text-sky-100">
+            {language === "javascript" ? "Verified Console Output" : "Console Output"}
+          </h4>
           <div className="max-h-36 overflow-auto font-mono text-xs text-zinc-100">
-            {step.snapshot.stdout.length ? step.snapshot.stdout.map((line, i) => <p key={`${line}-${i}`}>{line}</p>) : <p className="text-zinc-400">No output yet.</p>}
+            {consoleOutputLines.length ? consoleOutputLines.map((line, i) => <p key={`${line}-${i}`}>{line}</p>) : <p className="text-zinc-400">No output yet.</p>}
           </div>
         </div>
       </SectionCard>
+
+      {language === "javascript" ? (
+        <SectionCard title="Runtime Verification">
+          {verification.status === "verifying" ? (
+            <p className="text-sm text-zinc-300">Checking output against real JavaScript runtime...</p>
+          ) : verification.status === "ok" ? (
+            <p className="text-sm text-emerald-300">Runtime output verified. No corrections needed.</p>
+          ) : verification.status === "mismatch" ? (
+            <div className="space-y-2">
+              <p className="text-sm text-amber-200">Output mismatch found. Auto-fixes are shown below.</p>
+              {verification.issues.map((issue) => (
+                <article key={issue.id} className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-3 text-xs text-amber-100">
+                  <p>Line {issue.line}</p>
+                  <p>Simulated: {issue.simulatedOutput}</p>
+                  <p>Runtime: {issue.actualOutput}</p>
+                  <p>Fix: {issue.fix}</p>
+                </article>
+              ))}
+            </div>
+          ) : verification.status === "error" ? (
+            <p className="text-sm text-red-300">Verification error: {verification.error ?? "Unknown runtime verifier error."}</p>
+          ) : (
+            <p className="text-sm text-zinc-400">Verification will run automatically while you type.</p>
+          )}
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Inside JS Engine (Step Details)">
         <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-200">

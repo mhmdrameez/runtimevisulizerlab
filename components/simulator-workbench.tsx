@@ -5,8 +5,9 @@ import { CodeEditorPanel } from "@/components/CodeEditor/code-editor-panel";
 import { ControlsBar } from "@/components/Controls/controls-bar";
 import { VisualizationPanel } from "@/components/Visualization/visualization-panel";
 import { simulateRuntime } from "@/lib/engineSimulator/simulate-runtime";
+import { verifyJavaScriptRuntimeOutput } from "@/lib/engineSimulator/verify-js-runtime-output";
 import { buildPerformanceTips } from "@/lib/engineSimulator/perf-insights";
-import type { VisualizationMode } from "@/types/simulator";
+import type { RuntimeVerificationState, VisualizationMode } from "@/types/simulator";
 
 const DEFAULT_CODE = `function add(a, b) {
   return a + b;
@@ -26,6 +27,7 @@ const EMPTY_CODE = "";
 
 const PLAYBACK_MS = 900;
 const AUTO_RUN_DEBOUNCE_MS = 850;
+const VERIFY_DEBOUNCE_MS = 260;
 
 function estimateHeapBytes(memory: Array<{ key: string; value: string; scope: string }>): number {
   return memory.reduce((total, item) => {
@@ -45,11 +47,18 @@ export function SimulatorWorkbench() {
   const [isRunning, setIsRunning] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [lastRunMs, setLastRunMs] = useState<number | null>(null);
+  const [verification, setVerification] = useState<RuntimeVerificationState>({
+    status: "idle",
+    verifiedOutput: [],
+    issues: [],
+    error: undefined,
+  });
   const timerRef = useRef<number | null>(null);
   const runStartRef = useRef<number | null>(null);
   const lastNarratedStepIdRef = useRef<string | null>(null);
   const autoRunDebounceRef = useRef<number | null>(null);
   const lastAutoRunCodeRef = useRef<string>("");
+  const verifyRequestIdRef = useRef(0);
 
   const { steps, error } = useMemo(() => {
     return simulateRuntime(language, code);
@@ -285,6 +294,50 @@ export function SimulatorWorkbench() {
     return clearAutoRunDebounce;
   }, [code, autoRunOnType, steps.length, error, isRunning, onReset]);
 
+  useEffect(() => {
+    verifyRequestIdRef.current += 1;
+    const requestId = verifyRequestIdRef.current;
+
+    if (language !== "javascript" || !code.trim() || error || steps.length === 0) {
+      const idleTimer = window.setTimeout(() => {
+        if (verifyRequestIdRef.current !== requestId) {
+          return;
+        }
+        setVerification({
+          status: "idle",
+          verifiedOutput: [],
+          issues: [],
+          error: undefined,
+        });
+      }, 0);
+      return () => window.clearTimeout(idleTimer);
+    }
+
+    const statusTimer = window.setTimeout(() => {
+      if (verifyRequestIdRef.current !== requestId) {
+        return;
+      }
+      setVerification((previous) => ({
+        ...previous,
+        status: "verifying",
+        error: undefined,
+      }));
+    }, 0);
+
+    const timer = window.setTimeout(async () => {
+      const result = await verifyJavaScriptRuntimeOutput(code, steps);
+      if (verifyRequestIdRef.current !== requestId) {
+        return;
+      }
+      setVerification(result);
+    }, VERIFY_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(statusTimer);
+      window.clearTimeout(timer);
+    };
+  }, [language, code, error, steps]);
+
   return (
     <main className="h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_top,#162039_0%,#0d111c_42%,#090c13_100%)] px-4 py-4 text-zinc-100 sm:px-6">
       <div className="mx-auto flex h-full max-w-[1600px] flex-col rounded-2xl border border-cyan-400/20 bg-[#0a0e17]/95 shadow-[0_20px_80px_rgba(2,8,23,0.6)]">
@@ -351,6 +404,7 @@ export function SimulatorWorkbench() {
             activeLine={currentStep?.snapshot.activeLine ?? 1}
             language={language}
             parseError={error}
+            verificationIssues={verification.issues}
           />
           <VisualizationPanel
             step={currentStep}
@@ -359,6 +413,7 @@ export function SimulatorWorkbench() {
             totalSteps={steps.length}
             language={language}
             mode={mode}
+            verification={verification}
             performance={{
               estimatedRunMs,
               simulationBuildMs,

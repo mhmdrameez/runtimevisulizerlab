@@ -45,6 +45,21 @@ export interface SimulationStep {
   snapshot: SimulationSnapshot;
 }
 
+export interface RuntimeVerificationIssue {
+  id: string;
+  line: number;
+  simulatedOutput: string;
+  actualOutput: string;
+  fix: string;
+}
+
+export interface RuntimeVerificationState {
+  status: "idle" | "verifying" | "ok" | "mismatch" | "error";
+  verifiedOutput: string[];
+  issues: RuntimeVerificationIssue[];
+  error?: string;
+}
+
 export interface FunctionInfo {
   name: string;
   params: string[];
