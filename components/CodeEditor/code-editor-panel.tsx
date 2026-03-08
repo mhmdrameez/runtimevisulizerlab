@@ -9,6 +9,7 @@ import type { RuntimeVerificationIssue, SupportedLanguage } from "@/types/simula
 interface CodeEditorPanelProps {
   code: string;
   onChange: (value: string) => void;
+  onRunShortcut?: () => void;
   activeLine: number;
   language: SupportedLanguage;
   parseError?: string;
@@ -28,7 +29,7 @@ function getEditorLabel(language: SupportedLanguage): string {
   return `editor.${extMap[language]}`;
 }
 
-export function CodeEditorPanel({ code, onChange, activeLine, language, parseError, verificationIssues = [] }: CodeEditorPanelProps) {
+export function CodeEditorPanel({ code, onChange, onRunShortcut, activeLine, language, parseError, verificationIssues = [] }: CodeEditorPanelProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -66,6 +67,11 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
     });
 
     monaco.editor.setTheme("engine-lab");
+
+    editorInstance.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      () => onRunShortcut?.(),
+    );
   };
 
   const getErrorLocation = (error: string): { line: number; column: number } | null => {

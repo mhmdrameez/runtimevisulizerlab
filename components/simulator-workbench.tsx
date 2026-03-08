@@ -262,18 +262,6 @@ export function SimulatorWorkbench() {
   };
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-        event.preventDefault();
-        onRun();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onRun]);
-
-  useEffect(() => {
     clearAutoRunDebounce();
     if (!autoRunOnType) {
       return;
@@ -430,6 +418,7 @@ export function SimulatorWorkbench() {
               setStepIndex(0);
               setCode(value);
             }}
+            onRunShortcut={onRun}
             activeLine={currentStep?.snapshot.activeLine ?? 1}
             language={language}
             parseError={error}
