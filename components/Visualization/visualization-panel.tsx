@@ -278,7 +278,7 @@ export function VisualizationPanel({
       : step.snapshot.stdout;
 
   return (
-    <section className="flex min-h-0 flex-col gap-3 overflow-auto pr-1">
+    <section className="flex min-h-[44dvh] flex-col gap-3 overflow-auto pr-1 lg:min-h-0">
       <SectionCard
         title="What Line Is Running"
         collapsible

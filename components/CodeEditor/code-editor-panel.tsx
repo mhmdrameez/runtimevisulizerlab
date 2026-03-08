@@ -210,13 +210,13 @@ export function CodeEditorPanel({ code, onChange, activeLine, language, parseErr
   }, [code, language, parseError]);
 
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#0b1220]">
+    <section className="flex min-h-[46dvh] flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#0b1220] sm:min-h-[52dvh] lg:min-h-0">
       <div className="flex items-center justify-between border-b border-zinc-700 px-3 py-2 text-xs text-zinc-300">
         <span>{getEditorLabel(language)}</span>
         <span className="rounded bg-zinc-800 px-2 py-1 text-[11px] text-zinc-400">Monaco</span>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div className="h-[42dvh] min-h-[18rem] flex-1 sm:h-[48dvh] lg:h-auto lg:min-h-0">
         <Editor
           language={language}
           value={code}

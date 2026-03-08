@@ -339,8 +339,8 @@ export function SimulatorWorkbench() {
   }, [language, code, error, steps]);
 
   return (
-    <main className="h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_top,#162039_0%,#0d111c_42%,#090c13_100%)] px-4 py-4 text-zinc-100 sm:px-6">
-      <div className="mx-auto flex h-full max-w-[1600px] flex-col rounded-2xl border border-cyan-400/20 bg-[#0a0e17]/95 shadow-[0_20px_80px_rgba(2,8,23,0.6)]">
+    <main className="min-h-dvh w-full overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top,#162039_0%,#0d111c_42%,#090c13_100%)] px-3 py-3 text-zinc-100 sm:px-6 sm:py-4">
+      <div className="mx-auto flex min-h-[calc(100dvh-1.5rem)] max-w-[1600px] flex-col rounded-2xl border border-cyan-400/20 bg-[#0a0e17]/95 shadow-[0_20px_80px_rgba(2,8,23,0.6)] sm:min-h-[calc(100dvh-2rem)]">
         <header className="flex items-center justify-between border-b border-zinc-700/60 px-5 py-3">
           <div>
             <h1 className="font-mono text-sm uppercase tracking-[0.22em] text-cyan-300">INSIDE JS</h1>
@@ -391,7 +391,7 @@ export function SimulatorWorkbench() {
           canClear={code.trim().length > 0 || stepIndex > 0 || isRunning}
         />
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[1.1fr_1fr]">
+        <section className="grid grid-cols-1 gap-3 p-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[1.1fr_1fr]">
           <CodeEditorPanel
             code={code}
             onChange={(value) => {
