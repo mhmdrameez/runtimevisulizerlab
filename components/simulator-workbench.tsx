@@ -250,20 +250,29 @@ export function SimulatorWorkbench({
           throw new Error("Server simulation request failed.");
         }
 
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Unexpected simulation response.");
+        }
+
         const payload = await response.json() as {
-          steps: SimulationStep[];
+          steps?: SimulationStep[];
           narrationNotes?: string[];
           error?: string;
           buildMs?: number;
-        };
+        } | null;
 
         if (simulationRequestIdRef.current !== requestId) {
           return;
         }
 
-        setSteps(payload.steps ?? []);
-        setError(payload.error);
-        setSimulationBuildMs(Math.max(0.1, Number(payload.buildMs ?? 0.1)));
+        const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+        const nextError = typeof payload?.error === "string" ? payload.error : undefined;
+        const nextBuildMs = Number(payload?.buildMs);
+
+        setSteps(steps);
+        setError(nextError);
+        setSimulationBuildMs(Number.isFinite(nextBuildMs) && nextBuildMs > 0 ? nextBuildMs : 0.1);
       } catch (fetchError) {
         const isAbort = fetchError instanceof DOMException && fetchError.name === "AbortError";
         if (isAbort) {

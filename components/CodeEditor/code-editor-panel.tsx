@@ -93,9 +93,15 @@ export function CodeEditorPanel({
       return null;
     }
 
+    const line = Number(match[1]);
+    const column = Number(match[2]);
+    if (!Number.isFinite(line) || !Number.isFinite(column)) {
+      return null;
+    }
+
     return {
-      line: Number(match[1]),
-      column: Number(match[2]) + 1,
+      line,
+      column: column + 1,
     };
   };
 
@@ -107,14 +113,23 @@ export function CodeEditorPanel({
       return;
     }
 
-    if (lastActiveLineRef.current === activeLine) {
+    const model = editorInstance.getModel();
+    if (!model) {
       return;
     }
-    lastActiveLineRef.current = activeLine;
+
+    const lineCount = model.getLineCount();
+    const normalizedLine = Number.isFinite(activeLine) ? activeLine : 1;
+    const safeActiveLine = Math.min(Math.max(normalizedLine, 1), Math.max(lineCount, 1));
+
+    if (lastActiveLineRef.current === safeActiveLine) {
+      return;
+    }
+    lastActiveLineRef.current = safeActiveLine;
 
     decorationsRef.current = editorInstance.deltaDecorations(decorationsRef.current, [
       {
-        range: new monaco.Range(activeLine, 1, activeLine, 1),
+        range: new monaco.Range(safeActiveLine, 1, safeActiveLine, 1),
         options: {
           isWholeLine: true,
           className: "engine-active-line",
@@ -123,7 +138,7 @@ export function CodeEditorPanel({
       },
     ]);
 
-    editorInstance.revealLineInCenter(activeLine);
+    editorInstance.revealLineInCenter(safeActiveLine);
   }, [activeLine]);
 
   useEffect(() => {
@@ -144,8 +159,10 @@ export function CodeEditorPanel({
     }
 
     const position = getErrorLocation(parseError) ?? { line: 1, column: 1 };
-    const safeLine = Math.min(Math.max(position.line, 1), model.getLineCount());
-    const safeColumn = Math.min(Math.max(position.column, 1), model.getLineMaxColumn(safeLine));
+    const rawLine = Number.isFinite(position.line) ? position.line : 1;
+    const safeLine = Math.min(Math.max(rawLine, 1), model.getLineCount());
+    const rawColumn = Number.isFinite(position.column) ? position.column : 1;
+    const safeColumn = Math.min(Math.max(rawColumn, 1), model.getLineMaxColumn(safeLine));
 
     monaco.editor.setModelMarkers(model, "runtime-parse", [
       {
@@ -180,7 +197,8 @@ export function CodeEditorPanel({
       model,
       "runtime-verify",
       verificationIssues.map((issue) => {
-        const safeLine = Math.min(Math.max(issue.line, 1), model.getLineCount());
+        const rawLine = Number.isFinite(issue.line) ? issue.line : 1;
+        const safeLine = Math.min(Math.max(rawLine, 1), model.getLineCount());
         const startColumn = 1;
         const endColumn = model.getLineMaxColumn(safeLine);
         return {
@@ -223,7 +241,9 @@ export function CodeEditorPanel({
         return;
       }
 
-      const lineText = model.getLineContent(first.startLineNumber).trim() || "(empty line)";
+      const rawLine = Number.isFinite(first.startLineNumber) ? first.startLineNumber : 1;
+      const safeLine = Math.min(Math.max(rawLine, 1), model.getLineCount());
+      const lineText = model.getLineContent(safeLine).trim() || "(empty line)";
       const compactMessage = first.message.replace(/\s+/g, " ").trim();
       setInlineEditorError(`${lineText}   // error: ${compactMessage}`);
     };
