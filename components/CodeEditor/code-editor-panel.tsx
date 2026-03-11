@@ -53,12 +53,12 @@ export function CodeEditorPanel({
     monacoRef.current = monaco;
 
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-      noSemanticValidation: false,
-      noSyntaxValidation: false,
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
     });
     monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
       allowNonTsExtensions: true,
-      checkJs: true,
+      checkJs: false,
       target: monaco.languages.typescript.ScriptTarget.ES2022,
     });
 
