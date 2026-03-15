@@ -534,26 +534,7 @@ export function SimulatorWorkbench({
           </div>
           <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
             <p className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100">JavaScript</p>
-            <a
-              href={`${GITHUB_URL}/blob/main/CONTRIBUTING.md`}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-md border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs text-emerald-100 hover:bg-emerald-500/25"
-            >
-              Contribute
-            </a>
             <BuyMeCoffee />
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-              aria-label="Open GitHub repository"
-              title="Open GitHub repository"
-            >
-              <GitHubIcon />
-              <span>GitHub</span>
-            </a>
             <button
               type="button"
               onClick={() => setMode((current) => (current === "beginner" ? "advanced" : "beginner"))}
