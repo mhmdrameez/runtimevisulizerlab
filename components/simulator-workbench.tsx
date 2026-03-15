@@ -4,14 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeEditorPanel } from "@/components/CodeEditor/code-editor-panel";
 import { ControlsBar } from "@/components/Controls/controls-bar";
 import { VisualizationPanel } from "@/components/Visualization/visualization-panel";
-import { AdBanner } from "@/components/ad-banner";
+import { GoogleAd } from "@/components/GoogleAd";
 import { BuyMeCoffee } from "@/components/buy-me-coffee";
 import { verifyJavaScriptRuntimeOutput } from "@/lib/engineSimulator/verify-js-runtime-output";
 import { buildPerformanceTips } from "@/lib/engineSimulator/perf-insights";
 import type { RuntimeVerificationState, SimulationStep, VisualizationMode } from "@/types/simulator";
 import { DEFAULT_SIMULATION_CODE } from "@/lib/engineSimulator/default-code";
 
-const GITHUB_URL = "https://github.com/mhmdrameez/runtimevisulizerlab";
 
 const EMPTY_CODE = "";
 
@@ -30,13 +29,6 @@ function estimateHeapBytes(memory: Array<{ key: string; value: string; scope: st
   }, 0);
 }
 
-function GitHubIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
-      <path d="M12 .5a12 12 0 0 0-3.79 23.38c.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.38-1.33-1.75-1.33-1.75-1.1-.75.09-.74.09-.74 1.2.09 1.84 1.23 1.84 1.23 1.08 1.85 2.83 1.31 3.52 1 .11-.78.42-1.31.77-1.61-2.66-.3-5.47-1.33-5.47-5.9 0-1.3.46-2.35 1.22-3.18-.12-.3-.53-1.54.12-3.2 0 0 1-.32 3.28 1.22a11.42 11.42 0 0 1 5.97 0c2.27-1.54 3.27-1.22 3.27-1.22.65 1.66.24 2.9.12 3.2.76.83 1.22 1.88 1.22 3.18 0 4.58-2.81 5.59-5.49 5.89.44.38.82 1.11.82 2.25v3.33c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z" />
-    </svg>
-  );
-}
 
 function estimateSpeechMs(text: string, playbackRate: number): number {
   const words = Math.max(1, text.trim().split(/\s+/).length);
@@ -602,7 +594,7 @@ export function SimulatorWorkbench({
           />
         </section>
         <div className="mx-auto w-full max-w-4xl px-3 pb-4">
-          <AdBanner dataAdSlot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID || ""} />
+          <GoogleAd dataAdSlot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID || ""} />
         </div>
       </div>
     </main>
