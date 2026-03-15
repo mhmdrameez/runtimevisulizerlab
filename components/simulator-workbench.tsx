@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeEditorPanel } from "@/components/CodeEditor/code-editor-panel";
 import { ControlsBar } from "@/components/Controls/controls-bar";
 import { VisualizationPanel } from "@/components/Visualization/visualization-panel";
+import { AdBanner } from "@/components/ad-banner";
 import { verifyJavaScriptRuntimeOutput } from "@/lib/engineSimulator/verify-js-runtime-output";
 import { buildPerformanceTips } from "@/lib/engineSimulator/perf-insights";
 import type { RuntimeVerificationState, SimulationStep, VisualizationMode } from "@/types/simulator";
@@ -617,6 +618,9 @@ export function SimulatorWorkbench({
             performance={performanceData}
           />
         </section>
+        <div className="mx-auto w-full max-w-4xl px-3 pb-4">
+          <AdBanner dataAdSlot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID || ""} />
+        </div>
       </div>
     </main>
   );
