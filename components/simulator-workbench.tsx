@@ -5,6 +5,7 @@ import { CodeEditorPanel } from "@/components/CodeEditor/code-editor-panel";
 import { ControlsBar } from "@/components/Controls/controls-bar";
 import { VisualizationPanel } from "@/components/Visualization/visualization-panel";
 import { AdBanner } from "@/components/ad-banner";
+import { BuyMeCoffee } from "@/components/buy-me-coffee";
 import { verifyJavaScriptRuntimeOutput } from "@/lib/engineSimulator/verify-js-runtime-output";
 import { buildPerformanceTips } from "@/lib/engineSimulator/perf-insights";
 import type { RuntimeVerificationState, SimulationStep, VisualizationMode } from "@/types/simulator";
@@ -541,6 +542,7 @@ export function SimulatorWorkbench({
             >
               Contribute
             </a>
+            <BuyMeCoffee />
             <a
               href={GITHUB_URL}
               target="_blank"
